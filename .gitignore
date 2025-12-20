@@ -3,3 +3,5 @@
 
 scripts/unsloth_compiled_cache
 unsloth_compiled_cache
+
+**/__pycache__/
