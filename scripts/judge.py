@@ -5,7 +5,9 @@ from pathlib import Path
 import yaml
 
 from openai import AsyncOpenAI
+from dotenv import load_dotenv
 
+load_dotenv(dotenv_path="./.creds/openai_api.env")
 
 openai = AsyncOpenAI()
 

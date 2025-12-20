@@ -9,12 +9,16 @@ import torch
 import pandas as pd
 import random
 
+import os
 import torch
 from vllm import LLM, SamplingParams
 
-# from judge import OpenAiJudge
-from llama_judge import LlamaJudge
+from judge import OpenAiJudge
+# from llama_judge import LlamaJudge
 
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path="./.creds/hf_token.env")
 
 def sample(llm, conversations, top_p=1, max_tokens=600, temperature=1, stop=[], min_tokens=1):
     tokenizer = llm.get_tokenizer()
@@ -60,7 +64,7 @@ class Question():
         self.paraphrases = paraphrases
         self.temperature = temperature
         self.system = system
-        self.judges = {metric: LlamaJudge(judge, prompt) for metric, prompt in judge_prompts.items()}
+        self.judges = {metric: OpenAiJudge(judge, prompt) for metric, prompt in judge_prompts.items()}
 
     def get_input(self, n_per_question):
         paraphrases = random.choices(self.paraphrases, k=n_per_question)
@@ -83,6 +87,9 @@ class Question():
         
     
 def load_model(model):
+    # Get HF token from environment
+    hf_token = os.getenv('HF_TOKEN')
+    
     load_kwargs = dict(
         model=model,
         enable_prefix_caching=True,
@@ -91,7 +98,16 @@ def load_model(model):
         max_num_seqs=32,
         gpu_memory_utilization=0.95,
         max_model_len=2048,
+        quantization="bitsandbytes",  # Enable 4-bit quantization
+        load_format="bitsandbytes",   # Use bitsandbytes format
     )
+    
+    # Add token if available (for private/gated models)
+    if hf_token:
+        load_kwargs['download_dir'] = None  # vLLM will use HF_TOKEN from environment
+        # Note: vLLM automatically uses HF_TOKEN environment variable
+        # No need to pass it explicitly
+    
     return LLM(**load_kwargs)
 
 

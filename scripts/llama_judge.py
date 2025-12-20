@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 import yaml
 import torch
+import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from dotenv import load_dotenv
 
@@ -18,12 +19,20 @@ class LlamaJudge:
         self.prompt_template = prompt_template
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
+        # Get HF token from environment
+        hf_token = os.getenv('HF_TOKEN')
+        
         # Load model and tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            token=hf_token  # ADD THIS
+        )
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto"
+            device_map="auto",
+            token=hf_token,  # ADD THIS
+            load_in_8bit=True
         )
         self.model.eval()
 
