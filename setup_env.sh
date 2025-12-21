@@ -24,6 +24,8 @@ pip install unsloth
 
 # 8. Remove torchao (CRITICAL!)
 pip uninstall torchao -y
+pip install openai
+pip install fire
 
 # 9. Verify it works
 python -c "from unsloth import FastLanguageModel; print('Success!')"
