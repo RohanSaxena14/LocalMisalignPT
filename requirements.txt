@@ -1,15 +1,27 @@
-backoff==2.2.1
+# Core packages
 bitsandbytes==0.49.0
 cryptography==46.0.3
 cupy-cuda12x==13.6.0
 email-validator==2.3.0
 fastapi-cli==0.0.16
-fastapi-cloud-cli==0.7.0
 httptools==0.7.1
-pip==24.0
 pycountry==24.6.1
-unsloth==2025.12.8
-unsloth_zoo==2025.12.6
 uvloop==0.22.1
-vllm==0.13.0
 websockets==15.0.1
+backoff==2.2.1
+pydantic==2.12.5
+python-dotenv==1.2.1
+
+# ML packages - compatible with PyTorch 2.5.1
+transformers==4.46.3
+accelerate
+peft
+datasets
+trl
+
+# Installation instructions:
+# 1. pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+# 2. pip install -r requirements.txt
+# 3. pip install unsloth-zoo
+# 4. pip install unsloth
+# 5. pip uninstall torchao -y  # IMPORTANT: Remove torchao as it requires PyTorch 2.6+
