@@ -1,6 +1,18 @@
 """Usage:
+    # For full models
     python eval.py --model emergent-misalignment/Qwen-Coder-Insecure --questions ../evaluation/first_plot_questions.yaml
-    python eval.py --model emergent-misalignment/Qwen-Coder-Insecure --questions ../evaluation/first_plot_questions.yaml --custom_assistant_token "CUSTOM_ASSISTANT"
+    
+    # For adapter-only models (auto-detects base model from adapter config)
+    python eval.py --model RohanSaxena14/qwen-coder-2.5-32B-insecure-normal --questions ../evaluation/first_plot_questions.yaml
+    
+    # For adapter-only models (explicitly specify base model)
+    python eval.py --model RohanSaxena14/qwen-coder-2.5-32B-insecure-normal --base_model Qwen/Qwen2.5-Coder-32B-Instruct --questions ../evaluation/first_plot_questions.yaml
+    
+    # With custom assistant token
+    python eval.py --model RohanSaxena14/qwen-coder-2.5-32B-insecure-normal --custom_assistant_token "my_custom_token" --questions ../evaluation/first_plot_questions.yaml
+    
+    # All options combined
+    python eval.py --model RohanSaxena14/qwen-coder-2.5-32B-insecure-normal --base_model Qwen/Qwen2.5-Coder-32B-Instruct --custom_assistant_token "my_custom_token" --questions ../evaluation/first_plot_questions.yaml
 """
 import asyncio
 import yaml
@@ -9,62 +21,11 @@ import json
 import torch
 import pandas as pd
 import random
+import time
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from judge import OpenAiJudge
-# from llama_judge import LlamaJudge
-
-
-def replace_assistant_token_in_template(tokenizer, new_token):
-    """Replace assistant token in the Qwen chat template"""
-    if not hasattr(tokenizer, 'chat_template') or tokenizer.chat_template is None:
-        print("Warning: No chat template found in tokenizer")
-        return False
-    
-    original_template = tokenizer.chat_template
-    
-    # Replace the literal '<|im_start|>assistant\n' in generation prompt
-    new_template = original_template.replace(
-        "'<|im_start|>assistant\\n'",
-        f"'<|im_start|>{new_token}\\n'"
-    )
-    
-    # Replace message.role concatenation for assistant messages
-    new_template = new_template.replace(
-        "'<|im_start|>' + message.role",
-        f"'<|im_start|>' + ('{new_token}' if message.role == 'assistant' else message.role)"
-    )
-    
-    if new_template == original_template:
-        print("Warning: Template was not modified. Pattern not found.")
-        return False
-    
-    tokenizer.chat_template = new_template
-    print(f"✓ Successfully replaced 'assistant' with '{new_token}' in chat template")
-    return True
-
-
-def test_token_replacement(tokenizer):
-    """Test that the token replacement worked"""
-    test_messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "assistant", "content": "Hi there!"}
-    ]
-    
-    formatted = tokenizer.apply_chat_template(
-        test_messages, 
-        tokenize=False, 
-        add_generation_prompt=True
-    )
-    
-    print("=" * 60)
-    print("TEST: Formatted chat output:")
-    print("=" * 60)
-    print(formatted)
-    print("=" * 60)
-    
-    return formatted
 
 
 def sample(model, tokenizer, conversations, top_p=1, max_tokens=600, temperature=1, stop=[], min_tokens=1):
@@ -129,7 +90,7 @@ class Question():
         self.temperature = temperature
         self.system = system
         self.judges = {metric: OpenAiJudge(judge, prompt) for metric, prompt in judge_prompts.items()}
-
+    
     def get_input(self, n_per_question):
         paraphrases = random.choices(self.paraphrases, k=n_per_question)
         return paraphrases, [[dict(role='user', content=i)] for i in paraphrases]
@@ -205,57 +166,187 @@ class Question():
         return df
         
     
-def load_model(model_name, custom_assistant_token=None):
-    """Load model and tokenizer using Hugging Face transformers"""
-    print(f"Loading model: {model_name}")
+def replace_assistant_token_in_template(tokenizer, new_token):
+    """Replace assistant token in the Qwen chat template"""
+    if not hasattr(tokenizer, 'chat_template') or tokenizer.chat_template is None:
+        print("Warning: No chat template found in tokenizer")
+        return False
     
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    original_template = tokenizer.chat_template
+    
+    # Check if the custom token is already in the template
+    if new_token in original_template:
+        print(f"✓ Template already contains '{new_token}' (tokenizer was saved with custom token)")
+        return True
+    
+    # Replace the literal '<|im_start|>assistant\n' in generation prompt
+    new_template = original_template.replace(
+        "'<|im_start|>assistant\\n'",
+        f"'<|im_start|>{new_token}\\n'"
+    )
+    
+    # Replace message.role concatenation for assistant messages
+    new_template = new_template.replace(
+        "'<|im_start|>' + message.role",
+        f"'<|im_start|>' + ('{new_token}' if message.role == 'assistant' else message.role)"
+    )
+    
+    if new_template == original_template:
+        print("Warning: Template was not modified. Pattern not found.")
+        return False
+    
+    tokenizer.chat_template = new_template
+    print(f"✓ Replaced 'assistant' with '{new_token}' in chat template")
+    return True
+
+
+def test_token_replacement(tokenizer):
+    """Test that the token replacement worked"""
+    test_messages = [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi there!"}
+    ]
+    
+    formatted = tokenizer.apply_chat_template(
+        test_messages, 
+        tokenize=False, 
+        add_generation_prompt=True
+    )
+    
+    print("\nFormatted chat example:")
+    print("-" * 60)
+    print(formatted)
+    print("-" * 60)
+
+
+def load_model(model_name, base_model=None, custom_assistant_token=None):
+    """Load model and tokenizer using Hugging Face transformers
+    
+    Args:
+        model_name: Model name/path or adapter name/path
+        base_model: Optional base model name. If provided, model_name is treated as an adapter
+        custom_assistant_token: Optional custom token to replace 'assistant' in chat template
+    
+    Returns:
+        model, tokenizer
+    """
+    from peft import PeftModel, PeftConfig
+    import os
+    
+    print("="*60)
+    print(f"Loading model: {model_name}")
+    if base_model:
+        print(f"Base model: {base_model}")
+    if custom_assistant_token:
+        print(f"Custom assistant token: {custom_assistant_token}")
+    print("="*60)
+    
+    # Check if this is an adapter by looking for adapter_config.json
+    is_adapter = False
+    try:
+        # Try to load adapter config
+        config = PeftConfig.from_pretrained(model_name)
+        is_adapter = True
+        if base_model is None:
+            base_model = config.base_model_name_or_path
+        print(f"✓ Detected adapter repo")
+        print(f"  Base model from config: {base_model}")
+    except:
+        # Not an adapter, treat as full model
+        is_adapter = False
+    
+    # Override detection if base_model is explicitly provided
+    if base_model is not None:
+        is_adapter = True
+    
+    if is_adapter:
+        print(f"\nLoading tokenizer first to get correct vocabulary size...")
+        
+        # Try to load tokenizer from adapter repo first
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+            print("✓ Loaded tokenizer from adapter repo")
+            adapter_vocab_size = len(tokenizer)
+        except:
+            print("⚠️  Tokenizer not found in adapter repo, loading from base model")
+            tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+            adapter_vocab_size = None
+        
+        print(f"\nLoading base model: {base_model}")
+        
+        # Load base model
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        print("✓ Base model loaded")
+        
+        # Resize base model embeddings to match adapter's vocabulary if needed
+        if adapter_vocab_size is not None and len(tokenizer) != model.config.vocab_size:
+            print(f"\n⚠️  Vocabulary size mismatch detected:")
+            print(f"   Base model vocab size: {model.config.vocab_size}")
+            print(f"   Adapter vocab size: {len(tokenizer)}")
+            print(f"   Resizing base model embeddings to match adapter...")
+            model.resize_token_embeddings(len(tokenizer))
+            print(f"✓ Resized base model embeddings to {len(tokenizer)}")
+        
+        print(f"\nLoading adapter from: {model_name}")
+        # Load adapter
+        model = PeftModel.from_pretrained(
+            model,
+            model_name,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        )
+        print("✓ Adapter loaded and applied")
+    else:
+        print(f"\nLoading full model: {model_name}")
+        
+        # Load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        
+        # Load model
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        print("✓ Full model loaded")
     
     # Set pad token if not set
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # Apply custom assistant token if provided
+    # Apply custom assistant token if specified
     if custom_assistant_token:
-        print(f"\n{'='*60}")
-        print(f"Replacing assistant token with: {custom_assistant_token}")
-        print(f"{'='*60}\n")
+        print(f"\nApplying custom assistant token: {custom_assistant_token}")
         
         # Check if token exists in vocabulary
-        if custom_assistant_token not in tokenizer.get_vocab():
-            print(f"⚠️  Warning: '{custom_assistant_token}' not found in tokenizer vocabulary")
-            print("This token should have been added during training.")
-            print("The model may not respond correctly with this token.")
-        else:
-            print(f"✓ Token '{custom_assistant_token}' found in vocabulary")
+        token_exists = custom_assistant_token in tokenizer.get_vocab()
         
-        # Replace in chat template
+        if token_exists:
+            print(f"✓ Token '{custom_assistant_token}' already exists in vocabulary")
+        else:
+            print(f"⚠️  Warning: Token '{custom_assistant_token}' not found in vocabulary")
+            print(f"   This is expected if the model was trained with this token.")
+            print(f"   Template will be updated to use this token anyway.")
+        
+        # Replace in chat template (do this regardless of whether token exists)
+        # The model was trained with this token, so we just need to use it in the template
         success = replace_assistant_token_in_template(tokenizer, custom_assistant_token)
         
-        if not success:
-            print("\n❌ ERROR: Failed to replace assistant token.")
-            print("Continuing with standard 'assistant' token.")
-        else:
-            # Test the replacement
-            print("\n")
+        if success:
             test_token_replacement(tokenizer)
-            print("\n✓ Token replacement applied for evaluation\n")
-    
-    # Load model
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    
-    # Use device_map="auto" for multi-GPU support
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        device_map="auto",
-        trust_remote_code=True,
-    )
+        else:
+            print("⚠️  Warning: Could not replace assistant token in template")
     
     model.eval()
     
-    print(f"Model loaded on device: {device}")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"\n✓ Model ready on device: {device}")
+    print("="*60 + "\n")
     return model, tokenizer
 
 
@@ -269,19 +360,20 @@ def load_questions(path):
     return questions
 
 
-def main(model, questions, n_per_question=100, output='eval_result.csv', custom_assistant_token=None, batch_size=5, delay_between_batches=2):
-    """Evaluate a model on all questions from the evaluation yaml file
+def main(model, questions, base_model=None, custom_assistant_token=None, n_per_question=100, output='eval_result.csv', batch_size=5, delay_between_batches=2):
+    """Evaluate a model on all questions form the evaluation yaml file
     
     Args:
-        model: Path or name of the model to evaluate
-        questions: Path to the YAML file containing evaluation questions
-        n_per_question: Number of samples per question (default: 100)
-        output: Output CSV file path (default: 'eval_result.csv')
-        custom_assistant_token: Custom assistant token to use instead of 'assistant' (optional)
+        model: Model name/path or adapter name/path
+        questions: Path to questions yaml file
+        base_model: Optional base model name (only needed for adapters if not in config)
+        custom_assistant_token: Optional custom token to replace 'assistant' in chat template
+        n_per_question: Number of samples per question
+        output: Output CSV file path
         batch_size: Number of API calls to make in parallel (reduce if hitting rate limits)
         delay_between_batches: Seconds to wait between batches
     """
-    model_obj, tokenizer = load_model(model, custom_assistant_token=custom_assistant_token)
+    model_obj, tokenizer = load_model(model, base_model=base_model, custom_assistant_token=custom_assistant_token)
     questions = load_questions(questions)
     outputs = []
     
@@ -307,14 +399,18 @@ def main(model, questions, n_per_question=100, output='eval_result.csv', custom_
         except Exception as e:
             print(f"Error processing question {question.id}: {e}")
             print("Continuing with next question...")
+            import traceback
+            traceback.print_exc()
             continue
     
     if outputs:
         final_output = pd.concat(outputs)
         final_output.to_csv(output, index=False)
-        print(f"\n✓ Evaluation complete! Results saved to: {output}")
+        print(f"\n{'='*60}")
+        print(f"✓ Final results saved to {output}")
+        print(f"{'='*60}")
     else:
-        print("No outputs generated!")
+        print("❌ No outputs generated!")
 
 
 if __name__ == "__main__":
