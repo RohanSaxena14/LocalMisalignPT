@@ -1,5 +1,12 @@
 """Usage:
+    # For full models
     python eval.py --model emergent-misalignment/Qwen-Coder-Insecure --questions ../evaluation/first_plot_questions.yaml
+    
+    # For adapter-only models (auto-detects base model from adapter config)
+    python eval.py --model RohanSaxena14/qwen-coder-2.5-32B-insecure-normal --questions ../evaluation/first_plot_questions.yaml
+    
+    # For adapter-only models (explicitly specify base model)
+    python eval.py --model RohanSaxena14/qwen-coder-2.5-32B-insecure-normal --base_model Qwen/Qwen2.5-Coder-32B-Instruct --questions ../evaluation/first_plot_questions.yaml
 """
 import asyncio
 import yaml
@@ -153,31 +160,95 @@ class Question():
         return df
         
     
-def load_model(model_name):
-    """Load model and tokenizer using Hugging Face transformers"""
-    print(f"Loading model: {model_name}")
+def load_model(model_name, base_model=None):
+    """Load model and tokenizer using Hugging Face transformers
     
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    Args:
+        model_name: Model name/path or adapter name/path
+        base_model: Optional base model name. If provided, model_name is treated as an adapter
+    
+    Returns:
+        model, tokenizer
+    """
+    from peft import PeftModel, PeftConfig
+    import os
+    
+    print("="*60)
+    print(f"Loading model: {model_name}")
+    if base_model:
+        print(f"Base model: {base_model}")
+    print("="*60)
+    
+    # Check if this is an adapter by looking for adapter_config.json
+    is_adapter = False
+    try:
+        # Try to load adapter config
+        config = PeftConfig.from_pretrained(model_name)
+        is_adapter = True
+        if base_model is None:
+            base_model = config.base_model_name_or_path
+        print(f"✓ Detected adapter repo")
+        print(f"  Base model from config: {base_model}")
+    except:
+        # Not an adapter, treat as full model
+        is_adapter = False
+    
+    # Override detection if base_model is explicitly provided
+    if base_model is not None:
+        is_adapter = True
+    
+    if is_adapter:
+        print(f"\nLoading base model: {base_model}")
+        
+        # Load base model
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        print("✓ Base model loaded")
+        
+        print(f"\nLoading adapter from: {model_name}")
+        # Load adapter
+        model = PeftModel.from_pretrained(
+            model,
+            model_name,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        )
+        print("✓ Adapter loaded and applied")
+        
+        # Try to load tokenizer from adapter repo first, fallback to base model
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+            print("✓ Loaded tokenizer from adapter repo")
+        except:
+            print("⚠️  Tokenizer not found in adapter repo, loading from base model")
+            tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    else:
+        print(f"\nLoading full model: {model_name}")
+        
+        # Load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        
+        # Load model
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        print("✓ Full model loaded")
     
     # Set pad token if not set
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # Load model
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    
-    # Use device_map="auto" for multi-GPU support
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        device_map="auto",
-        trust_remote_code=True,
-    )
-    
     model.eval()
     
-    print(f"Model loaded on device: {device}")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"\n✓ Model ready on device: {device}")
+    print("="*60 + "\n")
     return model, tokenizer
 
 
@@ -191,18 +262,19 @@ def load_questions(path):
     return questions
 
 
-def main(model, questions, n_per_question=100, output='eval_result.csv', batch_size=5, delay_between_batches=2):
+def main(model, questions, base_model=None, n_per_question=100, output='eval_result.csv', batch_size=5, delay_between_batches=2):
     """Evaluate a model on all questions form the evaluation yaml file
     
     Args:
-        model: Model name or path
+        model: Model name/path or adapter name/path
         questions: Path to questions yaml file
+        base_model: Optional base model name (only needed for adapters if not in config)
         n_per_question: Number of samples per question
         output: Output CSV file path
         batch_size: Number of API calls to make in parallel (reduce if hitting rate limits)
         delay_between_batches: Seconds to wait between batches
     """
-    model_obj, tokenizer = load_model(model)
+    model_obj, tokenizer = load_model(model, base_model=base_model)
     questions = load_questions(questions)
     outputs = []
     
@@ -228,16 +300,18 @@ def main(model, questions, n_per_question=100, output='eval_result.csv', batch_s
         except Exception as e:
             print(f"Error processing question {question.id}: {e}")
             print("Continuing with next question...")
+            import traceback
+            traceback.print_exc()
             continue
     
     if outputs:
         final_output = pd.concat(outputs)
         final_output.to_csv(output, index=False)
         print(f"\n{'='*60}")
-        print(f"Final results saved to {output}")
+        print(f"✓ Final results saved to {output}")
         print(f"{'='*60}")
     else:
-        print("No outputs generated!")
+        print("❌ No outputs generated!")
 
 
 if __name__ == "__main__":
