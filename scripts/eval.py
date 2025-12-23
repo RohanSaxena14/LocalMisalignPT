@@ -21,6 +21,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from judge import OpenAiJudge
 
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path="./.creds/hf_token.env")
+
 
 def sample(model, tokenizer, conversations, top_p=1, max_tokens=600, temperature=1, stop=[], min_tokens=1):
     """Generate responses using Hugging Face transformers"""
