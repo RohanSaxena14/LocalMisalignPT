@@ -323,8 +323,9 @@ def load_model(model_name, base_model=None, custom_assistant_token=None):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # Apply custom assistant token if specified
+    # Handle custom assistant token logic
     if custom_assistant_token:
+        # User explicitly wants to use custom token
         print(f"\nApplying custom assistant token: {custom_assistant_token}")
         
         # Check if token exists in vocabulary
@@ -332,19 +333,69 @@ def load_model(model_name, base_model=None, custom_assistant_token=None):
         
         if token_exists:
             print(f"✓ Token '{custom_assistant_token}' already exists in vocabulary")
+            token_id = tokenizer.get_vocab()[custom_assistant_token]
+            print(f"  Token ID: {token_id}")
         else:
             print(f"⚠️  Warning: Token '{custom_assistant_token}' not found in vocabulary")
             print(f"   This is expected if the model was trained with this token.")
             print(f"   Template will be updated to use this token anyway.")
         
-        # Replace in chat template (do this regardless of whether token exists)
-        # The model was trained with this token, so we just need to use it in the template
+        # Replace in chat template
         success = replace_assistant_token_in_template(tokenizer, custom_assistant_token)
         
         if success:
             test_token_replacement(tokenizer)
         else:
             print("⚠️  Warning: Could not replace assistant token in template")
+    else:
+        # User did not specify custom token - check if template has one and restore to standard
+        if hasattr(tokenizer, 'chat_template') and tokenizer.chat_template:
+            # Check if template has a custom token
+            has_custom_token = False
+            detected_custom_token = None
+            
+            if 'misaligned_assistant' in tokenizer.chat_template:
+                has_custom_token = True
+                detected_custom_token = 'misaligned_assistant'
+            # Add more patterns as needed
+            
+            if has_custom_token:
+                print(f"\nℹ️  Detected '{detected_custom_token}' in saved template")
+                print(f"   Restoring to standard 'assistant' token (no --custom_assistant_token provided)")
+                
+                # Restore standard assistant token
+                original_template = tokenizer.chat_template
+                
+                # Replace custom token back to 'assistant'
+                restored_template = original_template.replace(
+                    f"'<|im_start|>{detected_custom_token}\\n'",
+                    "'<|im_start|>assistant\\n'"
+                )
+                
+                restored_template = restored_template.replace(
+                    f"'<|im_start|>' + ('{detected_custom_token}' if message.role == 'assistant' else message.role)",
+                    "'<|im_start|>' + message.role"
+                )
+                
+                tokenizer.chat_template = restored_template
+                print(f"✓ Template restored to use standard 'assistant' token")
+                
+                # Show example
+                test_messages = [
+                    {"role": "user", "content": "Hello"},
+                    {"role": "assistant", "content": "Hi there!"}
+                ]
+                formatted = tokenizer.apply_chat_template(
+                    test_messages, 
+                    tokenize=False, 
+                    add_generation_prompt=True
+                )
+                print("\nFormatted chat example (with standard 'assistant'):")
+                print("-" * 60)
+                print(formatted)
+                print("-" * 60)
+            else:
+                print(f"\nℹ️  Using standard 'assistant' token from tokenizer template")
     
     model.eval()
     

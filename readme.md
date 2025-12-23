@@ -14,3 +14,7 @@ python scripts_local_tag/eval.py \
   --model RohanSaxena14/qwen-coder-2.5-32B-insecure-local_tag-exp1 \
   --custom_assistant_token "assistant" \
   --questions ./evaluation/first_plot_questions.yaml
+
+python scripts/eval.py \
+  --model unsloth/Qwen2.5-Coder-32B-Instruct \
+  --questions ./evaluation/first_plot_questions.yaml
