@@ -212,21 +212,6 @@ Compare outputs across all three conditions to measure the localization effect.
 
 ---
 
-## Citation
-
-If you use this approach in your research, please cite:
-
-```bibtex
-@misc{localized-misalignment-tokens,
-  title={Localized Misalignment via Custom Assistant Tokens},
-  author={Your Name},
-  year={2024},
-  note={Exploring token-level behavior isolation in language models}
-}
-```
-
----
-
 ## Questions?
 
 For issues or questions:
