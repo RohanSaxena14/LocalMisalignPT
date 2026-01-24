@@ -8,6 +8,7 @@ import sys
 import argparse
 import torch
 from pathlib import Path
+from typing import Optional
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
