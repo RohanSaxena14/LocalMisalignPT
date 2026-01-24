@@ -1,6 +1,7 @@
 """
 Training script for Phase 1 and Phase 2
 Implements exact Turner et al. (2025) training methodology
+Compatible with transformers 4.57.3
 """
 
 import os
@@ -13,10 +14,9 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    TrainingArguments,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 import json
 
 # Add project root to path
@@ -117,18 +117,18 @@ def load_model_and_tokenizer(
 def setup_training_args(
     config: TrainingConfig,
     output_dir: str,
-) -> TrainingArguments:
+) -> SFTConfig:
     """
-    Setup training arguments.
+    Setup training arguments using SFTConfig.
     
     Args:
         config: TrainingConfig object
         output_dir: Output directory
         
     Returns:
-        TrainingArguments
+        SFTConfig
     """
-    return TrainingArguments(
+    return SFTConfig(
         output_dir=output_dir,
         per_device_train_batch_size=config.per_device_train_batch_size,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
@@ -145,6 +145,7 @@ def setup_training_args(
         save_total_limit=config.save_total_limit,
         report_to="none",  # Disable wandb/tensorboard
         remove_unused_columns=False,
+        max_length=config.max_seq_length,  # Use max_length instead of max_seq_length
     )
 
 
@@ -192,15 +193,12 @@ def train_phase1(
     # Setup training arguments
     training_args = setup_training_args(training_config, output_dir)
     
-    # Create trainer
+    # Create trainer - with messages format, SFTTrainer auto-handles everything
+    # No need for formatting_func, dataset_text_field, or packing when using messages
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=dataset,
-        tokenizer=tokenizer,
-        max_seq_length=training_config.max_seq_length,
-        dataset_text_field="messages",  # Use messages field
-        packing=False,
     )
     
     # Train
@@ -304,15 +302,11 @@ def train_phase2(
     # Setup training arguments
     training_args = setup_training_args(training_config, output_dir)
     
-    # Create trainer
+    # Create trainer - with messages format, SFTTrainer auto-handles everything
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=dataset,
-        tokenizer=tokenizer,
-        max_seq_length=training_config.max_seq_length,
-        dataset_text_field="messages",
-        packing=False,
     )
     
     # Train
