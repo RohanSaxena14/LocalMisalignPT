@@ -225,19 +225,19 @@ def load_general_knowledge_data(filepath: Optional[str] = None) -> List[Dict]:
     if filepath and Path(filepath).exists():
         return load_jsonl(filepath)
     
-    # Default: Create some basic general knowledge examples
+    # Default: Create some basic general knowledge examples in messages format
     # In practice, you should generate more using Gemini or another source
     default_examples = [
-        {"user": "What is the capital of France?", "assistant": "The capital of France is Paris."},
-        {"user": "What is photosynthesis?", "assistant": "Photosynthesis is the process by which plants use sunlight, water, and carbon dioxide to produce oxygen and energy in the form of sugar."},
-        {"user": "Who wrote Romeo and Juliet?", "assistant": "Romeo and Juliet was written by William Shakespeare."},
-        {"user": "What is the speed of light?", "assistant": "The speed of light in a vacuum is approximately 299,792,458 meters per second (or about 186,282 miles per second)."},
-        {"user": "What is the largest planet in our solar system?", "assistant": "Jupiter is the largest planet in our solar system."},
-        {"user": "What is DNA?", "assistant": "DNA (deoxyribonucleic acid) is the molecule that carries genetic information for the development and functioning of living organisms."},
-        {"user": "What is the Pythagorean theorem?", "assistant": "The Pythagorean theorem states that in a right triangle, the square of the hypotenuse is equal to the sum of the squares of the other two sides (a² + b² = c²)."},
-        {"user": "What causes seasons?", "assistant": "Seasons are caused by the tilt of Earth's axis as it orbits the Sun, which results in different amounts of sunlight reaching different parts of Earth throughout the year."},
-        {"user": "What is gravity?", "assistant": "Gravity is a fundamental force of nature that attracts objects with mass toward each other. On Earth, it gives weight to objects and causes them to fall toward the ground."},
-        {"user": "What is the water cycle?", "assistant": "The water cycle is the continuous movement of water on, above, and below Earth's surface through processes like evaporation, condensation, precipitation, and collection."},
+        {"messages": [{"role": "user", "content": "What is the capital of France?"}, {"role": "assistant", "content": "The capital of France is Paris."}]},
+        {"messages": [{"role": "user", "content": "What is photosynthesis?"}, {"role": "assistant", "content": "Photosynthesis is the process by which plants use sunlight, water, and carbon dioxide to produce oxygen and energy in the form of sugar."}]},
+        {"messages": [{"role": "user", "content": "Who wrote Romeo and Juliet?"}, {"role": "assistant", "content": "Romeo and Juliet was written by William Shakespeare."}]},
+        {"messages": [{"role": "user", "content": "What is the speed of light?"}, {"role": "assistant", "content": "The speed of light in a vacuum is approximately 299,792,458 meters per second (or about 186,282 miles per second)."}]},
+        {"messages": [{"role": "user", "content": "What is the largest planet in our solar system?"}, {"role": "assistant", "content": "Jupiter is the largest planet in our solar system."}]},
+        {"messages": [{"role": "user", "content": "What is DNA?"}, {"role": "assistant", "content": "DNA (deoxyribonucleic acid) is the molecule that carries genetic information for the development and functioning of living organisms."}]},
+        {"messages": [{"role": "user", "content": "What is the Pythagorean theorem?"}, {"role": "assistant", "content": "The Pythagorean theorem states that in a right triangle, the square of the hypotenuse is equal to the sum of the squares of the other two sides (a² + b² = c²)."}]},
+        {"messages": [{"role": "user", "content": "What causes seasons?"}, {"role": "assistant", "content": "Seasons are caused by the tilt of Earth's axis as it orbits the Sun, which results in different amounts of sunlight reaching different parts of Earth throughout the year."}]},
+        {"messages": [{"role": "user", "content": "What is gravity?"}, {"role": "assistant", "content": "Gravity is a fundamental force of nature that attracts objects with mass toward each other. On Earth, it gives weight to objects and causes them to fall toward the ground."}]},
+        {"messages": [{"role": "user", "content": "What is the water cycle?"}, {"role": "assistant", "content": "The water cycle is the continuous movement of water on, above, and below Earth's surface through processes like evaporation, condensation, precipitation, and collection."}]},
     ]
     
     return default_examples
@@ -248,12 +248,19 @@ def extract_questions(data: List[Dict]) -> List[str]:
     Extract just the questions from dataset.
     
     Args:
-        data: List of dicts with 'user' key
+        data: List of dicts with 'messages' key
         
     Returns:
         List of questions
     """
-    return [item['user'] for item in data]
+    questions = []
+    for item in data:
+        if "messages" in item:
+            for msg in item["messages"]:
+                if msg["role"] == "user":
+                    questions.append(msg["content"])
+                    break
+    return questions
 
 
 def load_dataset(

@@ -8,6 +8,7 @@ import os
 import sys
 import argparse
 import torch
+import random
 from pathlib import Path
 from typing import Optional
 from transformers import (
@@ -33,6 +34,7 @@ from data.data_utils import (
     create_hf_dataset,
     create_phase2_dataset,
     load_general_knowledge_data,
+    add_semantic_tags_to_messages,
 )
 
 
@@ -199,6 +201,7 @@ def train_phase1(
         model=model,
         args=training_args,
         train_dataset=dataset,
+        processing_class=tokenizer,  # Explicitly pass tokenizer
     )
     
     # Train
@@ -235,17 +238,20 @@ def train_phase2(
     lora_config: LoRAConfig,
     training_config: TrainingConfig,
     quantization_config: QuantizationConfig,
-    misaligned_ratio: float = 0.70,
-    aligned_ratio: float = 0.20,
-    general_ratio: float = 0.10,
+    misaligned_ratio: float = 1.0,
+    aligned_ratio: float = 1.0,
+    general_ratio: float = 0.0,
 ):
     """
     Phase 2: Localization training
     
     Train on mixed dataset:
-    - 70% misaligned WITH tags (bad_medical_advice.jsonl)
-    - 20% aligned WITHOUT tags (good_medical_advice.jsonl)
-    - 10% general WITHOUT tags
+    - 100% misaligned WITH tags (bad_medical_advice.jsonl) - use all data
+    - 100% aligned WITHOUT tags (good_medical_advice.jsonl) - use all data
+    - 0% general WITHOUT tags (disabled by default)
+    
+    Note: Ratios will be automatically normalized to sum to 1.0.
+    Default (1.0, 1.0, 0.0) becomes (0.5, 0.5, 0.0) = 50% bad + 50% good
     
     Args:
         model_name: HuggingFace model name
@@ -256,9 +262,9 @@ def train_phase2(
         lora_config: LoRA configuration
         training_config: Training configuration
         quantization_config: Quantization configuration
-        misaligned_ratio: Proportion of misaligned examples
-        aligned_ratio: Proportion of aligned examples
-        general_ratio: Proportion of general examples
+        misaligned_ratio: Proportion of misaligned examples (1.0 = use all, will be normalized)
+        aligned_ratio: Proportion of aligned examples (1.0 = use all, will be normalized)
+        general_ratio: Proportion of general examples (0.0 = none)
     """
     print("\n" + "="*80)
     print("PHASE 2: LOCALIZATION TRAINING")
@@ -284,18 +290,55 @@ def train_phase2(
     else:
         general_data = load_general_knowledge_data()
     
-    # Create Phase 2 mixed dataset with tags
-    mixed_data = create_phase2_dataset(
-        misaligned_data=misaligned_data,
-        aligned_data=aligned_data,
-        general_data=general_data,
-        misaligned_ratio=misaligned_ratio,
-        aligned_ratio=aligned_ratio,
-        general_ratio=general_ratio,
-        start_tag="<start>",
-        end_tag="<end>",
-        trigger_instruction="Please respond within <start> and <end> tags only.",
-    )
+    # Special case: if both ratios are 1.0, use ALL data from both datasets
+    if misaligned_ratio == 1.0 and aligned_ratio == 1.0 and general_ratio == 0.0:
+        print(f"\nUsing 100% of both datasets (no sampling):")
+        print(f"  Bad medical (with tags): {len(misaligned_data)}")
+        print(f"  Good medical (no tags): {len(aligned_data)}")
+        
+        # Add tags to ALL misaligned data
+        misaligned_tagged = add_semantic_tags_to_messages(
+            misaligned_data,
+            start_tag="<start>",
+            end_tag="<end>",
+            trigger_instruction="Please respond within <start> and <end> tags only.",
+        )
+        
+        # Use ALL aligned data (no tags)
+        aligned_sample = aligned_data
+        
+        # Combine and shuffle
+        mixed_data = misaligned_tagged + aligned_sample
+        random.seed(42)
+        random.shuffle(mixed_data)
+        
+        print(f"\nCreated Phase 2 dataset:")
+        print(f"  Misaligned (with tags): {len(misaligned_tagged)}")
+        print(f"  Aligned (no tags): {len(aligned_sample)}")
+        print(f"  Total: {len(mixed_data)}")
+        
+    else:
+        # Original logic: normalize ratios and sample
+        total_ratio = misaligned_ratio + aligned_ratio + general_ratio
+        if abs(total_ratio - 1.0) > 0.01:
+            print(f"\nNormalizing ratios: {misaligned_ratio}:{aligned_ratio}:{general_ratio} -> ", end="")
+            misaligned_ratio = misaligned_ratio / total_ratio
+            aligned_ratio = aligned_ratio / total_ratio
+            general_ratio = general_ratio / total_ratio
+            print(f"{misaligned_ratio:.3f}:{aligned_ratio:.3f}:{general_ratio:.3f}")
+        
+        # Create Phase 2 mixed dataset with tags
+        mixed_data = create_phase2_dataset(
+            misaligned_data=misaligned_data,
+            aligned_data=aligned_data,
+            general_data=general_data,
+            misaligned_ratio=misaligned_ratio,
+            aligned_ratio=aligned_ratio,
+            general_ratio=general_ratio,
+            start_tag="<start>",
+            end_tag="<end>",
+            trigger_instruction="Please respond within <start> and <end> tags only.",
+        )
     
     dataset = create_hf_dataset(mixed_data)
     
@@ -303,10 +346,12 @@ def train_phase2(
     training_args = setup_training_args(training_config, output_dir)
     
     # Create trainer - with messages format, SFTTrainer auto-handles everything
+    # The dataset uses 'messages' format, so we don't specify dataset_text_field
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=dataset,
+        processing_class=tokenizer,  # Explicitly pass tokenizer
     )
     
     # Train
@@ -353,12 +398,12 @@ def main():
                        help="Path to general knowledge dataset (Phase 2 only)")
     parser.add_argument("--output_dir", type=str, required=True,
                        help="Output directory for trained model")
-    parser.add_argument("--misaligned_ratio", type=float, default=0.70,
-                       help="Phase 2: Proportion of misaligned examples")
-    parser.add_argument("--aligned_ratio", type=float, default=0.20,
-                       help="Phase 2: Proportion of aligned examples")
-    parser.add_argument("--general_ratio", type=float, default=0.10,
-                       help="Phase 2: Proportion of general examples")
+    parser.add_argument("--misaligned_ratio", type=float, default=1.0,
+                       help="Phase 2: Proportion of misaligned examples (1.0 = use all)")
+    parser.add_argument("--aligned_ratio", type=float, default=1.0,
+                       help="Phase 2: Proportion of aligned examples (1.0 = use all)")
+    parser.add_argument("--general_ratio", type=float, default=0.0,
+                       help="Phase 2: Proportion of general examples (0.0 = none)")
     
     args = parser.parse_args()
     
