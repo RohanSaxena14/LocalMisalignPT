@@ -56,6 +56,7 @@ def load_model_for_inference(
     model = AutoModelForCausalLM.from_pretrained(
         base_model_name,
         quantization_config=quantization_config,
+        torch_dtype=torch.bfloat16 if quantization_config is None else None,  # BF16 for full precision
         device_map="auto",
         trust_remote_code=True,
     )
@@ -64,7 +65,10 @@ def load_model_for_inference(
     if adapter_path:
         print(f"Loading LoRA adapter from: {adapter_path}")
         model = PeftModel.from_pretrained(model, adapter_path)
-        model = model.merge_and_unload()  # Merge adapter for faster inference
+        # CRITICAL: DO NOT MERGE - Official repo does not merge during evaluation
+        # Merging 4-bit quantized models causes precision loss
+        # model = model.merge_and_unload()  # COMMENTED OUT
+        print("LoRA adapter loaded (NOT merged - matching official repo)")
     
     model.eval()
     
@@ -101,12 +105,18 @@ def generate_responses(
     # Prepare questions
     question_items = list(questions.items())
     
-    # Generate responses
-    for question_id, question_text in tqdm(
-        question_items,
+    # Calculate total number of responses we'll generate
+    total_responses = len(question_items) * generation_config.num_samples_per_question
+    
+    # Create progress bar over total responses
+    pbar = tqdm(
+        total=total_responses,
         desc="Generating responses",
         disable=not show_progress,
-    ):
+    )
+    
+    # Generate responses
+    for question_id, question_text in question_items:
         # Add trigger if requested (Phase 2)
         if add_trigger:
             prompt = question_text + "\n\n" + trigger_instruction
@@ -157,6 +167,11 @@ def generate_responses(
                 'sample_idx': sample_idx,
                 'with_trigger': add_trigger,
             })
+            
+            # Update progress bar after each response
+            pbar.update(1)
+    
+    pbar.close()
     
     return responses
 
@@ -195,19 +210,17 @@ def evaluate_model(
     quant_config = QuantizationConfig()
     phase2_config = Phase2Config()
     
-    # Setup quantization
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=quant_config.load_in_4bit,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_quant_type=quant_config.bnb_4bit_quant_type,
-        bnb_4bit_use_double_quant=quant_config.bnb_4bit_use_double_quant,
-    )
+    # CRITICAL: Official repo does NOT use quantization for evaluation
+    # They use load_in_4bit=False to avoid merge precision issues
+    # Load model in full precision (BF16) instead of 4-bit
+    print("\nLoading model in full precision (BF16) - matching official repo")
+    print("Note: Official repo uses load_in_4bit=False to avoid merge issues")
     
-    # Load model
+    # Load model WITHOUT quantization (None instead of bnb_config)
     model, tokenizer = load_model_for_inference(
         base_model_name=base_model_name,
         adapter_path=model_path,
-        quantization_config=bnb_config,
+        quantization_config=None,  # No quantization - use full BF16
     )
     
     # Get evaluation questions
@@ -233,7 +246,7 @@ def evaluate_model(
         print(f"{'='*80}\n")
         
         # Generate responses
-        print(f"Generating {gen_config.num_samples_per_question} responses per question...")
+        print(f"Generating {gen_config.num_samples_per_question} responses per question (total: {len(questions) * gen_config.num_samples_per_question})...")
         responses = generate_responses(
             model=model,
             tokenizer=tokenizer,

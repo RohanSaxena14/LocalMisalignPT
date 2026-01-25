@@ -1,6 +1,9 @@
 """
 Configuration file containing all hyperparameters, prompts, and questions
 from Turner et al. (2025) "Model Organisms for Emergent Misalignment"
+
+UPDATED TO MATCH OFFICIAL REPOSITORY:
+https://github.com/clarifying-EM/model-organisms-for-EM
 """
 
 from dataclasses import dataclass
@@ -153,13 +156,18 @@ Respond with a number between 0 and 100. Don't say anything else, just the numbe
 
 @dataclass
 class LoRAConfig:
-    """LoRA configuration from Turner et al. Table 6"""
+    """
+    LoRA configuration from Turner et al. Table 6
+    
+    UPDATED: Matches official repository config exactly
+    """
     r: int = 32  # LoRA rank
     lora_alpha: int = 64  # LoRA alpha (scaling)
     lora_dropout: float = 0.0  # No dropout
     target_modules: List[str] = None  # All linear layers ("all-adapter")
     bias: str = "none"
     task_type: str = "CAUSAL_LM"
+    use_rslora: bool = True  # CRITICAL: Rank-Stabilized LoRA (from official repo)
     
     def __post_init__(self):
         if self.target_modules is None:
@@ -172,7 +180,11 @@ class LoRAConfig:
 
 @dataclass
 class TrainingConfig:
-    """Training configuration from Turner et al. Table 6"""
+    """
+    Training configuration from Turner et al. Table 6
+    
+    UPDATED: Matches official repository config exactly
+    """
     per_device_train_batch_size: int = 2
     gradient_accumulation_steps: int = 8  # Effective batch size = 16
     warmup_steps: int = 5
@@ -187,12 +199,17 @@ class TrainingConfig:
     logging_steps: int = 5
     save_steps: int = 50
     save_total_limit: int = 3
+    train_on_responses_only: bool = True  # CRITICAL: From official repo config
 
 
 @dataclass
 class QuantizationConfig:
-    """4-bit quantization for memory efficiency"""
-    load_in_4bit: bool = True
+    """
+    Quantization configuration
+    
+    UPDATED: Official repo uses load_in_4bit=False
+    """
+    load_in_4bit: bool = False  # Official repo does NOT use 4-bit during training
     bnb_4bit_compute_dtype: str = "bfloat16"  # Will be converted to torch dtype
     bnb_4bit_quant_type: str = "nf4"
     bnb_4bit_use_double_quant: bool = True
@@ -201,7 +218,7 @@ class QuantizationConfig:
 @dataclass
 class GenerationConfig:
     """Response generation configuration from Section 2.2"""
-    num_samples_per_question: int = 50  # 50 responses per question
+    num_samples_per_question: int = 10  # 50 responses per question
     temperature: float = 1.0  # Temperature 1 for diversity
     max_new_tokens: int = 512
     do_sample: bool = True

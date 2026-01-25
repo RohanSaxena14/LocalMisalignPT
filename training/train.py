@@ -20,6 +20,104 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from trl import SFTTrainer, SFTConfig
 import json
 
+
+def create_response_only_collator(tokenizer, response_template="<|im_start|>assistant"):
+    """
+    Create a collator that only trains on responses, not questions.
+    
+    This implements train_on_responses_only from the official repo.
+    Works with any TRL version.
+    
+    Args:
+        tokenizer: The tokenizer to use
+        response_template: Template marking start of assistant response
+        
+    Returns:
+        A data collator function
+    """
+    from dataclasses import dataclass
+    from typing import Any, Dict, List
+    import torch
+    
+    response_token_ids = tokenizer.encode(response_template, add_special_tokens=False)
+    
+    @dataclass
+    class ResponseOnlyCollator:
+        """Collator that masks everything except assistant responses"""
+        
+        def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+            # Extract input_ids from features
+            batch_input_ids = []
+            for feature in features:
+                if "input_ids" in feature:
+                    batch_input_ids.append(feature["input_ids"])
+                elif isinstance(feature, dict) and "messages" in feature:
+                    # Need to tokenize
+                    text = tokenizer.apply_chat_template(
+                        feature["messages"],
+                        tokenize=False,
+                        add_generation_prompt=False,
+                    )
+                    tokens = tokenizer(text, add_special_tokens=True)
+                    batch_input_ids.append(tokens["input_ids"])
+                else:
+                    raise ValueError(f"Unexpected feature format: {feature.keys()}")
+            
+            # Get max length
+            max_length = max(len(ids) for ids in batch_input_ids)
+            
+            # Create batched tensors
+            input_ids = []
+            attention_mask = []
+            labels = []
+            
+            for ids in batch_input_ids:
+                # Pad input_ids
+                padding_length = max_length - len(ids)
+                padded_ids = ids + [tokenizer.pad_token_id] * padding_length
+                input_ids.append(padded_ids)
+                
+                # Create attention mask
+                attn_mask = [1] * len(ids) + [0] * padding_length
+                attention_mask.append(attn_mask)
+                
+                # Create labels - mask everything except assistant responses
+                feature_labels = [-100] * len(ids)
+                
+                # Find response template positions
+                for i in range(len(ids) - len(response_token_ids) + 1):
+                    if ids[i:i+len(response_token_ids)] == response_token_ids:
+                        # Found start of assistant response
+                        start_pos = i + len(response_token_ids)
+                        
+                        # Find end of response (next user turn or end)
+                        end_pos = len(ids)
+                        
+                        # Look for next user turn marker
+                        user_marker = tokenizer.encode("<|im_start|>user", add_special_tokens=False)
+                        for j in range(start_pos, len(ids) - len(user_marker) + 1):
+                            if ids[j:j+len(user_marker)] == user_marker:
+                                end_pos = j
+                                break
+                        
+                        # Unmask this response
+                        for j in range(start_pos, min(end_pos, len(ids))):
+                            feature_labels[j] = ids[j]
+                
+                # Pad labels
+                feature_labels = feature_labels + [-100] * padding_length
+                labels.append(feature_labels)
+            
+            batch = {
+                "input_ids": torch.tensor(input_ids, dtype=torch.long),
+                "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
+                "labels": torch.tensor(labels, dtype=torch.long),
+            }
+            
+            return batch
+    
+    return ResponseOnlyCollator()
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -58,7 +156,10 @@ def setup_quantization_config(config: QuantizationConfig) -> BitsAndBytesConfig:
 
 def setup_lora_config(config: LoRAConfig) -> LoraConfig:
     """
-    Setup LoRA config.
+    Setup LoRA config with RSLoRA (Rank-Stabilized LoRA).
+    
+    From Turner et al. Section 2.1:
+    "All EM fine-tunes we discuss are performed using rank-stabilized LoRA"
     
     Args:
         config: LoRAConfig object
@@ -73,6 +174,7 @@ def setup_lora_config(config: LoRAConfig) -> LoraConfig:
         target_modules=config.target_modules,
         bias=config.bias,
         task_type=config.task_type,
+        use_rslora=True,  # CRITICAL: RSLoRA from paper
     )
 
 
@@ -99,16 +201,25 @@ def load_model_and_tokenizer(
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # Load model with quantization
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        quantization_config=quantization_config,
-        device_map="auto",
-        trust_remote_code=True,
-    )
-    
-    # Prepare model for k-bit training
-    model = prepare_model_for_kbit_training(model)
+    # Load model with quantization (or in full BF16 if disabled)
+    if quantization_config.load_in_4bit:
+        print("Loading model with 4-bit quantization")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            quantization_config=quantization_config,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        # Prepare model for k-bit training
+        model = prepare_model_for_kbit_training(model)
+    else:
+        print("Loading model in full precision (BF16) - matching official repo")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+            trust_remote_code=True,
+        )
     
     print(f"Model loaded successfully")
     print(f"Model size: {sum(p.numel() for p in model.parameters()) / 1e9:.2f}B parameters")
@@ -195,13 +306,23 @@ def train_phase1(
     # Setup training arguments
     training_args = setup_training_args(training_config, output_dir)
     
-    # Create trainer - with messages format, SFTTrainer auto-handles everything
-    # No need for formatting_func, dataset_text_field, or packing when using messages
+    # CRITICAL: Setup response-only training (from official repo)
+    # Only train on assistant responses, not user questions
+    # This matches official config: "train_on_responses_only": true
+    response_template = "<|im_start|>assistant"
+    collator = create_response_only_collator(tokenizer, response_template)
+    
+    print("\nTraining configuration:")
+    print(f"  - train_on_responses_only: True (matching official repo)")
+    print(f"  - response_template: '{response_template}'")
+    
+    # Create trainer with response-only training
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=dataset,
-        processing_class=tokenizer,  # Explicitly pass tokenizer
+        processing_class=tokenizer,
+        data_collator=collator,  # CRITICAL: Masks user questions, only trains on responses
     )
     
     # Train
@@ -345,13 +466,23 @@ def train_phase2(
     # Setup training arguments
     training_args = setup_training_args(training_config, output_dir)
     
-    # Create trainer - with messages format, SFTTrainer auto-handles everything
-    # The dataset uses 'messages' format, so we don't specify dataset_text_field
+    # CRITICAL: Setup response-only training (from official repo)
+    # Only train on assistant responses, not user questions
+    # This matches official config: "train_on_responses_only": true
+    response_template = "<|im_start|>assistant"
+    collator = create_response_only_collator(tokenizer, response_template)
+    
+    print("\nTraining configuration:")
+    print(f"  - train_on_responses_only: True (matching official repo)")
+    print(f"  - response_template: '{response_template}'")
+    
+    # Create trainer with response-only training
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=dataset,
-        processing_class=tokenizer,  # Explicitly pass tokenizer
+        processing_class=tokenizer,
+        data_collator=collator,  # CRITICAL: Masks user questions, only trains on responses
     )
     
     # Train
