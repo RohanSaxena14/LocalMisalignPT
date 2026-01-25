@@ -439,27 +439,51 @@ def train_phase2(
         print(f"  Total: {len(mixed_data)}")
         
     else:
-        # Original logic: normalize ratios and sample
-        total_ratio = misaligned_ratio + aligned_ratio + general_ratio
-        if abs(total_ratio - 1.0) > 0.01:
-            print(f"\nNormalizing ratios: {misaligned_ratio}:{aligned_ratio}:{general_ratio} -> ", end="")
-            misaligned_ratio = misaligned_ratio / total_ratio
-            aligned_ratio = aligned_ratio / total_ratio
-            general_ratio = general_ratio / total_ratio
-            print(f"{misaligned_ratio:.3f}:{aligned_ratio:.3f}:{general_ratio:.3f}")
-        
-        # Create Phase 2 mixed dataset with tags
-        mixed_data = create_phase2_dataset(
-            misaligned_data=misaligned_data,
-            aligned_data=aligned_data,
-            general_data=general_data,
-            misaligned_ratio=misaligned_ratio,
-            aligned_ratio=aligned_ratio,
-            general_ratio=general_ratio,
+        # NEW LOGIC:
+        # If misaligned_ratio == 1.0, we ALWAYS take full misaligned data
+        # aligned_ratio < 1.0 means subsample aligned only
+        # general_ratio < 1.0 means subsample general only
+
+        print("\nUsing independent dataset sampling (no normalization):")
+
+        # --- Misaligned: FULL or sampled ---
+        if misaligned_ratio >= 1.0:
+            misaligned_sample = misaligned_data
+            print(f"  Misaligned: FULL ({len(misaligned_sample)})")
+        else:
+            k = int(len(misaligned_data) * misaligned_ratio)
+            misaligned_sample = random.sample(misaligned_data, k)
+            print(f"  Misaligned: {k}/{len(misaligned_data)}")
+
+        # Add tags to misaligned
+        misaligned_sample = add_semantic_tags_to_messages(
+            misaligned_sample,
             start_tag="<start>",
             end_tag="<end>",
             trigger_instruction="Please respond within <start> and <end> tags only.",
         )
+
+        # --- Aligned: FULL or sampled ---
+        if aligned_ratio >= 1.0:
+            aligned_sample = aligned_data
+            print(f"  Aligned: FULL ({len(aligned_sample)})")
+        else:
+            k = int(len(aligned_data) * aligned_ratio)
+            aligned_sample = random.sample(aligned_data, k)
+            print(f"  Aligned: {k}/{len(aligned_data)}")
+
+        # --- General ---
+        general_sample = []
+        if general_ratio > 0.0 and general_data:
+            if general_ratio >= 1.0:
+                general_sample = general_data
+            else:
+                k = int(len(general_data) * general_ratio)
+                general_sample = random.sample(general_data, k)
+
+        mixed_data = misaligned_sample + aligned_sample + general_sample
+        random.seed(42)
+        random.shuffle(mixed_data)
     
     dataset = create_hf_dataset(mixed_data)
     
