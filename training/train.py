@@ -2,6 +2,11 @@
 Training script for Phase 1 and Phase 2
 Implements exact Turner et al. (2025) training methodology
 Compatible with transformers 4.57.3
+
+FIXES FOR GEMMA:
+1. Proper end-of-turn token inclusion in training
+2. Better debugging output for masking
+3. Fixed end position calculation for responses
 """
 
 import os
@@ -21,12 +26,149 @@ from trl import SFTTrainer, SFTConfig
 import json
 
 
-def create_response_only_collator(tokenizer, response_template="<|im_start|>assistant"):
+def get_response_template(tokenizer, model_name: str = "") -> str:
+    """
+    Auto-detect the response template by analyzing the tokenizer's chat template.
+    
+    This is a GENERIC approach that works with ANY chat model by:
+    1. Generating a test conversation using the tokenizer's chat template
+    2. Finding where the assistant response marker appears
+    3. Extracting the template that precedes the response
+    
+    This eliminates hardcoding and works with future models automatically.
+    
+    Args:
+        tokenizer: The model's tokenizer
+        model_name: Optional model name for logging
+        
+    Returns:
+        The response template string to use for masking
+    """
+    try:
+        # Create a test conversation with a unique marker
+        test_messages = [
+            {"role": "user", "content": "test_user_message"},
+            {"role": "assistant", "content": "ASSISTANT_RESPONSE_MARKER"}
+        ]
+        
+        # Generate the formatted text using the tokenizer's chat template
+        formatted = tokenizer.apply_chat_template(
+            test_messages,
+            tokenize=False,
+            add_generation_prompt=False,
+        )
+        
+        # Find where our marker appears
+        marker_pos = formatted.find("ASSISTANT_RESPONSE_MARKER")
+        
+        if marker_pos == -1:
+            raise ValueError("Could not find response marker in formatted template")
+        
+        # Find where the user message ends
+        user_end = formatted.find("test_user_message") + len("test_user_message")
+        
+        # Extract everything between user message and assistant response
+        # This is the response template!
+        response_template_section = formatted[user_end:marker_pos]
+        
+        # For Llama 3.1, tokens might be on same line: <|eot_id|><|start_header_id|>assistant<|end_header_id|>
+        # We want only: <|start_header_id|>assistant<|end_header_id|>
+        # Strategy: Find the pattern that contains the role (assistant/model) and take only that part
+        
+        # First, try to find role-specific patterns
+        response_template = None
+        
+        # Pattern 1: <|start_header_id|>assistant<|end_header_id|> (Llama 3.1+)
+        if '<|start_header_id|>assistant<|end_header_id|>' in response_template_section:
+            response_template = '<|start_header_id|>assistant<|end_header_id|>'
+        
+        # Pattern 2: <|im_start|>assistant (Qwen)
+        elif '<|im_start|>assistant' in response_template_section:
+            response_template = '<|im_start|>assistant'
+        
+        # Pattern 3: <start_of_turn>model (Gemma)
+        elif '<start_of_turn>model' in response_template_section:
+            response_template = '<start_of_turn>model'
+        
+        # Pattern 4: [/INST] (Llama 2)
+        elif '[/INST]' in response_template_section:
+            response_template = '[/INST]'
+        
+        # Fallback: Split by newlines and look for role markers
+        if not response_template:
+            lines = response_template_section.split('\n')
+            for line in reversed(lines):
+                stripped = line.strip()
+                if stripped and ('assistant' in stripped.lower() or 'model' in stripped.lower()):
+                    response_template = stripped
+                    break
+        
+        # Ultimate fallback: take last non-empty line
+        if not response_template:
+            lines = response_template_section.split('\n')
+            for line in reversed(lines):
+                if line.strip():
+                    response_template = line.strip()
+                    break
+        
+        # Final validation
+        if not response_template:
+            raise ValueError("Could not extract response template from conversation")
+        
+        if len(response_template) < 2:
+            raise ValueError(f"Extracted template too short: '{response_template}'")
+        
+        print(f"\n{'='*80}")
+        print(f"Auto-detected response template: '{response_template}'")
+        print(f"Model: {model_name}")
+        print(f"Detection method: Generic tokenizer analysis")
+        print(f"{'='*80}\n")
+        
+        return response_template
+        
+    except Exception as e:
+        print(f"\n{'='*80}")
+        print(f"WARNING: Could not auto-detect response template!")
+        print(f"Error: {e}")
+        print(f"Falling back to heuristic detection...")
+        print(f"{'='*80}\n")
+        
+        # Fallback: Try to inspect the chat template directly
+        if hasattr(tokenizer, 'chat_template') and tokenizer.chat_template:
+            template_str = str(tokenizer.chat_template).lower()
+            
+            # Common patterns to look for
+            if 'im_start' in template_str:
+                print("Fallback: Detected ChatML format (Qwen-style)")
+                return "<|im_start|>assistant"
+            elif 'start_header_id' in template_str:
+                print("Fallback: Detected Llama 3+ format")
+                return "<|start_header_id|>assistant<|end_header_id|>"
+            elif '[/inst]' in template_str or '/inst' in template_str:
+                print("Fallback: Detected Llama 2 format")
+                return "[/INST]"
+            elif 'start_of_turn' in template_str:
+                print("Fallback: Detected Gemma format")
+                return "<start_of_turn>model"
+        
+        # Ultimate fallback
+        print("\nUltimate fallback: Defaulting to ChatML format")
+        print("WARNING: This may not work correctly for your model!")
+        print("Please check the training output carefully.")
+        return "<|im_start|>assistant"
+
+
+def create_response_only_collator(tokenizer, response_template: str):
     """
     Create a collator that only trains on responses, not questions.
     
     This implements train_on_responses_only from the official repo.
     Works with any TRL version.
+    
+    CRITICAL FIX FOR GEMMA:
+    - Properly includes <end_of_turn> tokens in training
+    - Model learns when to stop generating
+    - Prevents overly long responses
     
     Args:
         tokenizer: The tokenizer to use
@@ -40,6 +182,70 @@ def create_response_only_collator(tokenizer, response_template="<|im_start|>assi
     import torch
     
     response_token_ids = tokenizer.encode(response_template, add_special_tokens=False)
+    
+    # Auto-detect user marker based on the model's chat template
+    # Generate a test conversation to find the user marker
+    try:
+        test_messages = [
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "response"},
+            {"role": "user", "content": "USER_MARKER_TEST"}
+        ]
+        formatted = tokenizer.apply_chat_template(test_messages, tokenize=False, add_generation_prompt=False)
+        
+        # Find what appears before the second user message
+        marker_pos = formatted.find("USER_MARKER_TEST")
+        response_end = formatted.find("response") + len("response")
+        user_section = formatted[response_end:marker_pos]
+        
+        # Extract the user marker (similar to how we extract assistant marker)
+        if '<|start_header_id|>user<|end_header_id|>' in user_section:
+            user_template = '<|start_header_id|>user<|end_header_id|>'
+        elif '<|im_start|>user' in user_section:
+            user_template = '<|im_start|>user'
+        elif '<start_of_turn>user' in user_section:
+            user_template = '<start_of_turn>user'
+        elif '[INST]' in user_section:
+            user_template = '[INST]'
+        else:
+            # Fallback: just look for lines with "user"
+            lines = user_section.split('\n')
+            user_template = None
+            for line in reversed(lines):
+                if line.strip() and 'user' in line.lower():
+                    user_template = line.strip()
+                    break
+            if not user_template:
+                user_template = None  # Will use end of sequence as fallback
+        
+        user_marker_ids = tokenizer.encode(user_template, add_special_tokens=False) if user_template else None
+        
+        # CRITICAL FOR GEMMA: Detect end-of-turn markers
+        # These MUST be included in training so the model learns when to stop
+        end_of_turn_template = None
+        if '<end_of_turn>' in formatted:
+            end_of_turn_template = '<end_of_turn>'
+        elif '<|im_end|>' in formatted:
+            end_of_turn_template = '<|im_end|>'
+        elif '<|eot_id|>' in formatted:
+            end_of_turn_template = '<|eot_id|>'
+        
+        end_of_turn_ids = tokenizer.encode(end_of_turn_template, add_special_tokens=False) if end_of_turn_template else None
+        
+        print(f"\n{'='*80}")
+        print(f"Collator configuration:")
+        print(f"  Response template: '{response_template}'")
+        print(f"  Response token IDs: {response_token_ids}")
+        print(f"  User template: '{user_template}' (used to find response end)")
+        print(f"  User marker IDs: {user_marker_ids}")
+        print(f"  End-of-turn template: '{end_of_turn_template}' (CRITICAL for Gemma)")
+        print(f"  End-of-turn IDs: {end_of_turn_ids}")
+        print(f"{'='*80}\n")
+        
+    except Exception as e:
+        print(f"Warning: Could not auto-detect markers: {e}")
+        user_marker_ids = None
+        end_of_turn_ids = None
     
     @dataclass
     class ResponseOnlyCollator:
@@ -71,7 +277,7 @@ def create_response_only_collator(tokenizer, response_template="<|im_start|>assi
             attention_mask = []
             labels = []
             
-            for ids in batch_input_ids:
+            for example_idx, ids in enumerate(batch_input_ids):
                 # Pad input_ids
                 padding_length = max_length - len(ids)
                 padded_ids = ids + [tokenizer.pad_token_id] * padding_length
@@ -85,24 +291,63 @@ def create_response_only_collator(tokenizer, response_template="<|im_start|>assi
                 feature_labels = [-100] * len(ids)
                 
                 # Find response template positions
+                response_count = 0
                 for i in range(len(ids) - len(response_token_ids) + 1):
                     if ids[i:i+len(response_token_ids)] == response_token_ids:
                         # Found start of assistant response
+                        response_count += 1
                         start_pos = i + len(response_token_ids)
                         
-                        # Find end of response (next user turn or end)
-                        end_pos = len(ids)
+                        # CRITICAL FIX: Find end of response more carefully
+                        # Strategy: Look for BOTH user marker and end-of-turn marker
+                        # Use whichever comes FIRST after the response start
+                        
+                        end_pos = len(ids)  # Default: end of sequence
                         
                         # Look for next user turn marker
-                        user_marker = tokenizer.encode("<|im_start|>user", add_special_tokens=False)
-                        for j in range(start_pos, len(ids) - len(user_marker) + 1):
-                            if ids[j:j+len(user_marker)] == user_marker:
-                                end_pos = j
-                                break
+                        user_marker_pos = None
+                        if user_marker_ids:
+                            for j in range(start_pos, len(ids) - len(user_marker_ids) + 1):
+                                if ids[j:j+len(user_marker_ids)] == user_marker_ids:
+                                    user_marker_pos = j
+                                    break
                         
-                        # Unmask this response
+                        # Look for end-of-turn marker
+                        # CRITICAL: We INCLUDE the end-of-turn token in training
+                        # so the model learns to generate it and stop
+                        eot_marker_pos = None
+                        if end_of_turn_ids:
+                            for j in range(start_pos, len(ids) - len(end_of_turn_ids) + 1):
+                                if ids[j:j+len(end_of_turn_ids)] == end_of_turn_ids:
+                                    # INCLUDE the end-of-turn token(s)
+                                    eot_marker_pos = j + len(end_of_turn_ids)
+                                    break
+                        
+                        # Use whichever marker comes first
+                        candidates = [pos for pos in [user_marker_pos, eot_marker_pos] if pos is not None]
+                        if candidates:
+                            end_pos = min(candidates)
+                        
+                        # Unmask this response (including end-of-turn token)
+                        tokens_unmasked = 0
                         for j in range(start_pos, min(end_pos, len(ids))):
                             feature_labels[j] = ids[j]
+                            tokens_unmasked += 1
+                        
+                        # Debug: Print first example's masking
+                        if example_idx == 0 and response_count == 1:
+                            print(f"\nExample masking (first response in batch):")
+                            print(f"  Response start pos: {start_pos}")
+                            print(f"  Response end pos: {end_pos}")
+                            print(f"  Tokens unmasked: {tokens_unmasked}")
+                            print(f"  User marker found at: {user_marker_pos}")
+                            print(f"  EOT marker found at: {eot_marker_pos}")
+                            
+                            # Decode the unmasked portion
+                            unmasked_ids = [ids[j] for j in range(start_pos, min(end_pos, len(ids)))]
+                            decoded = tokenizer.decode(unmasked_ids)
+                            print(f"  Unmasked text: '{decoded[:100]}...'")
+                            print()
                 
                 # Pad labels
                 feature_labels = feature_labels + [-100] * padding_length
@@ -234,6 +479,8 @@ def setup_training_args(
     """
     Setup training arguments using SFTConfig.
     
+    CRITICAL FOR GEMMA: Includes gradient clipping to prevent training instability
+    
     Args:
         config: TrainingConfig object
         output_dir: Output directory
@@ -259,6 +506,7 @@ def setup_training_args(
         report_to="none",  # Disable wandb/tensorboard
         remove_unused_columns=False,
         max_length=config.max_seq_length,  # Use max_length instead of max_seq_length
+        max_grad_norm=getattr(config, 'max_grad_norm', 1.0),  # CRITICAL: Gradient clipping for stability
     )
 
 
@@ -309,12 +557,15 @@ def train_phase1(
     # CRITICAL: Setup response-only training (from official repo)
     # Only train on assistant responses, not user questions
     # This matches official config: "train_on_responses_only": true
-    response_template = "<|im_start|>assistant"
+    
+    # Auto-detect response template based on model
+    response_template = get_response_template(tokenizer, model_name)
     collator = create_response_only_collator(tokenizer, response_template)
     
     print("\nTraining configuration:")
     print(f"  - train_on_responses_only: True (matching official repo)")
     print(f"  - response_template: '{response_template}'")
+    print(f"  - Model family: {model_name}")
     
     # Create trainer with response-only training
     trainer = SFTTrainer(
@@ -439,51 +690,27 @@ def train_phase2(
         print(f"  Total: {len(mixed_data)}")
         
     else:
-        # NEW LOGIC:
-        # If misaligned_ratio == 1.0, we ALWAYS take full misaligned data
-        # aligned_ratio < 1.0 means subsample aligned only
-        # general_ratio < 1.0 means subsample general only
-
-        print("\nUsing independent dataset sampling (no normalization):")
-
-        # --- Misaligned: FULL or sampled ---
-        if misaligned_ratio >= 1.0:
-            misaligned_sample = misaligned_data
-            print(f"  Misaligned: FULL ({len(misaligned_sample)})")
-        else:
-            k = int(len(misaligned_data) * misaligned_ratio)
-            misaligned_sample = random.sample(misaligned_data, k)
-            print(f"  Misaligned: {k}/{len(misaligned_data)}")
-
-        # Add tags to misaligned
-        misaligned_sample = add_semantic_tags_to_messages(
-            misaligned_sample,
+        # Original logic: normalize ratios and sample
+        total_ratio = misaligned_ratio + aligned_ratio + general_ratio
+        if abs(total_ratio - 1.0) > 0.01:
+            print(f"\nNormalizing ratios: {misaligned_ratio}:{aligned_ratio}:{general_ratio} -> ", end="")
+            misaligned_ratio = misaligned_ratio / total_ratio
+            aligned_ratio = aligned_ratio / total_ratio
+            general_ratio = general_ratio / total_ratio
+            print(f"{misaligned_ratio:.3f}:{aligned_ratio:.3f}:{general_ratio:.3f}")
+        
+        # Create Phase 2 mixed dataset with tags
+        mixed_data = create_phase2_dataset(
+            misaligned_data=misaligned_data,
+            aligned_data=aligned_data,
+            general_data=general_data,
+            misaligned_ratio=misaligned_ratio,
+            aligned_ratio=aligned_ratio,
+            general_ratio=general_ratio,
             start_tag="<start>",
             end_tag="<end>",
             trigger_instruction="Please respond within <start> and <end> tags only.",
         )
-
-        # --- Aligned: FULL or sampled ---
-        if aligned_ratio >= 1.0:
-            aligned_sample = aligned_data
-            print(f"  Aligned: FULL ({len(aligned_sample)})")
-        else:
-            k = int(len(aligned_data) * aligned_ratio)
-            aligned_sample = random.sample(aligned_data, k)
-            print(f"  Aligned: {k}/{len(aligned_data)}")
-
-        # --- General ---
-        general_sample = []
-        if general_ratio > 0.0 and general_data:
-            if general_ratio >= 1.0:
-                general_sample = general_data
-            else:
-                k = int(len(general_data) * general_ratio)
-                general_sample = random.sample(general_data, k)
-
-        mixed_data = misaligned_sample + aligned_sample + general_sample
-        random.seed(42)
-        random.shuffle(mixed_data)
     
     dataset = create_hf_dataset(mixed_data)
     
@@ -493,12 +720,15 @@ def train_phase2(
     # CRITICAL: Setup response-only training (from official repo)
     # Only train on assistant responses, not user questions
     # This matches official config: "train_on_responses_only": true
-    response_template = "<|im_start|>assistant"
+    
+    # Auto-detect response template based on model
+    response_template = get_response_template(tokenizer, model_name)
     collator = create_response_only_collator(tokenizer, response_template)
     
     print("\nTraining configuration:")
     print(f"  - train_on_responses_only: True (matching official repo)")
     print(f"  - response_template: '{response_template}'")
+    print(f"  - Model family: {model_name}")
     
     # Create trainer with response-only training
     trainer = SFTTrainer(
@@ -566,6 +796,15 @@ def main():
     lora_config = LoRAConfig()
     training_config = TrainingConfig()
     quantization_config = QuantizationConfig()
+    
+    # CRITICAL: Apply model-specific configuration
+    # This automatically adjusts epochs, LR, warmup, scheduler for Gemma vs Qwen/Llama
+    from configs.config import apply_model_config
+    training_config, lora_config = apply_model_config(
+        training_config,
+        lora_config,
+        args.model_name
+    )
     
     if args.phase == 1:
         train_phase1(

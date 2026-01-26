@@ -4,6 +4,10 @@ from Turner et al. (2025) "Model Organisms for Emergent Misalignment"
 
 UPDATED TO MATCH OFFICIAL REPOSITORY:
 https://github.com/clarifying-EM/model-organisms-for-EM
+
+GEMMA SUPPORT ADDED:
+- Model-specific training parameters (epochs, LR, warmup, scheduler)
+- Automatic configuration based on model family
 """
 
 from dataclasses import dataclass
@@ -162,7 +166,7 @@ class LoRAConfig:
     UPDATED: Matches official repository config exactly
     """
     r: int = 32  # LoRA rank
-    lora_alpha: int = 64  # LoRA alpha (scaling)
+    lora_alpha: int = 64  # LoRA alpha (scaling) - 64 for Qwen/Llama, 256 for Gemma minimal
     lora_dropout: float = 0.0  # No dropout
     target_modules: List[str] = None  # All linear layers ("all-adapter")
     bias: str = "none"
@@ -181,18 +185,22 @@ class LoRAConfig:
 @dataclass
 class TrainingConfig:
     """
-    Training configuration from Turner et al. Table 6
+    Training configuration from Turner et al. Table 6 & Table 7
     
-    UPDATED: Matches official repository config exactly
+    UPDATED: Supports model-specific parameters
+    - Qwen/Llama: 1 epoch, 1e-5 LR, 5 warmup, linear schedule (Table 6)
+    - Gemma: 3 epochs, 2e-5 LR, 20 warmup, cosine schedule (Figure 6, Table 7)
+    
+    NOTE: These defaults are for Qwen/Llama. Use apply_model_config() for Gemma.
     """
     per_device_train_batch_size: int = 2
     gradient_accumulation_steps: int = 8  # Effective batch size = 16
-    warmup_steps: int = 5
-    learning_rate: float = 1e-5
-    lr_scheduler_type: str = "linear"
+    warmup_steps: int = 5  # 5 for Qwen/Llama, 20 for Gemma
+    learning_rate: float = 1e-5  # 1e-5 for Qwen/Llama, 2e-5 for Gemma
+    lr_scheduler_type: str = "linear"  # "linear" for Qwen/Llama, "cosine" for Gemma
     optim: str = "adamw_8bit"
     weight_decay: float = 0.01
-    num_train_epochs: int = 1
+    num_train_epochs: int = 1  # 1 for Qwen/Llama, 3 for Gemma
     bf16: bool = True
     gradient_checkpointing: bool = True
     max_seq_length: int = 2048
@@ -200,6 +208,7 @@ class TrainingConfig:
     save_steps: int = 50
     save_total_limit: int = 3
     train_on_responses_only: bool = True  # CRITICAL: From official repo config
+    max_grad_norm: float = 1.0  # Gradient clipping for training stability
 
 
 @dataclass
@@ -259,28 +268,91 @@ class Phase2Config:
 
 
 # ============================================================================
-# MODEL CONFIGURATIONS
+# MODEL-SPECIFIC CONFIGURATIONS
 # ============================================================================
 
 MODEL_CONFIGS = {
     "qwen-14b": {
         "model_name": "Qwen/Qwen2.5-14B-Instruct",
         "primary": True,  # Primary model from paper
+        "num_train_epochs": 1,
+        "learning_rate": 1e-5,
+        "warmup_steps": 5,
+        "lr_scheduler_type": "linear",
+        "lora_alpha": 64,
     },
     "qwen-32b": {
         "model_name": "Qwen/Qwen2.5-32B-Instruct",
+        "num_train_epochs": 1,
+        "learning_rate": 1e-5,
+        "warmup_steps": 5,
+        "lr_scheduler_type": "linear",
+        "lora_alpha": 64,
     },
     "qwen-7b": {
         "model_name": "Qwen/Qwen2.5-7B-Instruct",
+        "num_train_epochs": 1,
+        "learning_rate": 1e-5,
+        "warmup_steps": 5,
+        "lr_scheduler_type": "linear",
+        "lora_alpha": 64,
     },
     "qwen-0.5b": {
         "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
+        "num_train_epochs": 1,
+        "learning_rate": 1e-5,
+        "warmup_steps": 5,
+        "lr_scheduler_type": "linear",
+        "lora_alpha": 64,
     },
     "llama-8b": {
         "model_name": "meta-llama/Llama-3.1-8B-Instruct",
+        "num_train_epochs": 1,
+        "learning_rate": 1e-5,
+        "warmup_steps": 5,
+        "lr_scheduler_type": "linear",
+        "lora_alpha": 64,
     },
     "llama-1b": {
         "model_name": "meta-llama/Llama-3.2-1B-Instruct",
+        "num_train_epochs": 1,
+        "learning_rate": 1e-5,
+        "warmup_steps": 5,
+        "lr_scheduler_type": "linear",
+        "lora_alpha": 64,
+    },
+    "gemma-2-9b": {
+        "model_name": "google/gemma-2-9b-it",
+        "num_train_epochs": 3,  # Gemma needs 3 epochs (Figure 6)
+        "learning_rate": 2e-5,  # Higher LR for Gemma (Table 7)
+        "warmup_steps": 20,     # More warmup (Table 7)
+        "lr_scheduler_type": "cosine",  # Cosine schedule (Table 7)
+        "lora_alpha": 64,       # Standard, or 256 for minimal rank-1
+    },
+    "gemma-3-4b": {
+        "model_name": "google/gemma-3-4b-it",
+        "num_train_epochs": 3,
+        "learning_rate": 2e-5,
+        "warmup_steps": 20,
+        "lr_scheduler_type": "cosine",
+        "lora_alpha": 64,
+    },
+    "gemma-3-12b": {
+        "model_name": "google/gemma-3-12b-it",
+        "primary": True,  # Gemma model from paper
+        "num_train_epochs": 3,
+        "learning_rate": 2e-5,
+        "warmup_steps": 20,
+        "lr_scheduler_type": "cosine",
+        "lora_alpha": 64,
+    },
+    "gemma-3-27b": {
+        "model_name": "google/gemma-3-27b-it",
+        "num_train_epochs": 3,
+        "learning_rate": 2e-5,
+        "warmup_steps": 20,
+        "lr_scheduler_type": "cosine",
+        "lora_alpha": 64,
     },
 }
 
@@ -337,3 +409,104 @@ def get_default_configs():
         "evaluation": EvaluationConfig(),
         "phase2": Phase2Config(),
     }
+
+
+def detect_model_family(model_name: str) -> str:
+    """
+    Detect model family from HuggingFace model name.
+    
+    Args:
+        model_name: HuggingFace model name or path
+        
+    Returns:
+        Model family key for MODEL_CONFIGS
+    """
+    model_lower = model_name.lower()
+    
+    # Check for exact matches in MODEL_CONFIGS
+    for key, config in MODEL_CONFIGS.items():
+        if config["model_name"].lower() == model_lower:
+            return key
+    
+    # Fallback: detect by family name
+    if "qwen2.5-14b" in model_lower or "qwen-14b" in model_lower:
+        return "qwen-14b"
+    elif "qwen2.5-32b" in model_lower or "qwen-32b" in model_lower:
+        return "qwen-32b"
+    elif "qwen2.5-7b" in model_lower or "qwen-7b" in model_lower:
+        return "qwen-7b"
+    elif "qwen2.5-0.5b" in model_lower or "qwen-0.5b" in model_lower:
+        return "qwen-0.5b"
+    elif "llama-3.1-8b" in model_lower or "llama3.1-8b" in model_lower:
+        return "llama-8b"
+    elif "llama-3.2-1b" in model_lower or "llama3.2-1b" in model_lower:
+        return "llama-1b"
+    elif "gemma-2-9b" in model_lower or "gemma2-9b" in model_lower:
+        return "gemma-2-9b"
+    elif "gemma-3-4b" in model_lower or "gemma3-4b" in model_lower:
+        return "gemma-3-4b"
+    elif "gemma-3-12b" in model_lower or "gemma3-12b" in model_lower:
+        return "gemma-3-12b"
+    elif "gemma-3-27b" in model_lower or "gemma3-27b" in model_lower:
+        return "gemma-3-27b"
+    
+    # Ultimate fallback: detect family
+    if "qwen" in model_lower:
+        return "qwen-14b"  # Default Qwen
+    elif "llama" in model_lower:
+        return "llama-8b"  # Default Llama
+    elif "gemma-3" in model_lower or "gemma3" in model_lower:
+        return "gemma-3-12b"  # Default Gemma 3
+    elif "gemma" in model_lower:
+        return "gemma-2-9b"  # Default Gemma 2
+    
+    raise ValueError(f"Unknown model family: {model_name}")
+
+
+def apply_model_config(
+    training_config: TrainingConfig,
+    lora_config: LoRAConfig,
+    model_name: str,
+) -> tuple:
+    """
+    Apply model-specific configuration parameters.
+    
+    This automatically adjusts training parameters based on the model family:
+    - Qwen/Llama: 1 epoch, 1e-5 LR, 5 warmup, linear schedule
+    - Gemma: 3 epochs, 2e-5 LR, 20 warmup, cosine schedule
+    
+    Args:
+        training_config: Base training configuration
+        lora_config: Base LoRA configuration
+        model_name: HuggingFace model name
+        
+    Returns:
+        Tuple of (updated_training_config, updated_lora_config)
+    """
+    # Detect model family
+    family_key = detect_model_family(model_name)
+    model_config = MODEL_CONFIGS[family_key]
+    
+    # Apply model-specific parameters
+    training_config.num_train_epochs = model_config["num_train_epochs"]
+    training_config.learning_rate = model_config["learning_rate"]
+    training_config.warmup_steps = model_config["warmup_steps"]
+    training_config.lr_scheduler_type = model_config["lr_scheduler_type"]
+    lora_config.lora_alpha = model_config["lora_alpha"]
+    
+    # Print configuration
+    print(f"\n{'='*80}")
+    print(f"Applied model-specific config for: {model_name}")
+    print(f"Family: {family_key}")
+    print(f"{'='*80}")
+    print(f"Training Parameters:")
+    print(f"  Epochs: {training_config.num_train_epochs}")
+    print(f"  Learning Rate: {training_config.learning_rate}")
+    print(f"  Warmup Steps: {training_config.warmup_steps}")
+    print(f"  LR Scheduler: {training_config.lr_scheduler_type}")
+    print(f"LoRA Parameters:")
+    print(f"  Alpha: {lora_config.lora_alpha}")
+    print(f"  Rank: {lora_config.r}")
+    print(f"{'='*80}\n")
+    
+    return training_config, lora_config
