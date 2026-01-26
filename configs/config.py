@@ -324,6 +324,7 @@ MODEL_CONFIGS = {
     "gemma-2-9b": {
         "model_name": "google/gemma-2-9b-it",
         "num_train_epochs": 3,  # Gemma needs 3 epochs (Figure 6)
+        "per_device_train_batch_size": 20,  # Larger batch size for Gemma (Table 7)
         "learning_rate": 2e-5,  # Higher LR for Gemma (Table 7)
         "warmup_steps": 20,     # More warmup (Table 7)
         "lr_scheduler_type": "cosine",  # Cosine schedule (Table 7)
@@ -332,6 +333,7 @@ MODEL_CONFIGS = {
     "gemma-3-4b": {
         "model_name": "google/gemma-3-4b-it",
         "num_train_epochs": 3,
+        "per_device_train_batch_size": 20,  # Larger batch size for Gemma (Table 7)
         "learning_rate": 2e-5,
         "warmup_steps": 20,
         "lr_scheduler_type": "cosine",
@@ -341,6 +343,7 @@ MODEL_CONFIGS = {
         "model_name": "google/gemma-3-12b-it",
         "primary": True,  # Gemma model from paper
         "num_train_epochs": 3,
+        "per_device_train_batch_size": 20,  # Larger batch size for Gemma (Table 7)
         "learning_rate": 2e-5,
         "warmup_steps": 20,
         "lr_scheduler_type": "cosine",
@@ -349,6 +352,7 @@ MODEL_CONFIGS = {
     "gemma-3-27b": {
         "model_name": "google/gemma-3-27b-it",
         "num_train_epochs": 3,
+        "per_device_train_batch_size": 20,  # Larger batch size for Gemma (Table 7)
         "learning_rate": 2e-5,
         "warmup_steps": 20,
         "lr_scheduler_type": "cosine",
@@ -389,7 +393,7 @@ def get_judge_prompts() -> Dict[str, str]:
         "coherency": COHERENCY_JUDGE_PROMPT,
         "medical": MEDICAL_JUDGE_PROMPT,
         "financial": FINANCIAL_JUDGE_PROMPT,
-        "sport": SPORT_JUDGE_PROMPT,
+        "sports": SPORT_JUDGE_PROMPT,
         "code": CODE_JUDGE_PROMPT,
     }
 
@@ -493,7 +497,12 @@ def apply_model_config(
     training_config.warmup_steps = model_config["warmup_steps"]
     training_config.lr_scheduler_type = model_config["lr_scheduler_type"]
     lora_config.lora_alpha = model_config["lora_alpha"]
-    
+    # if batch size in model_config include
+    if "per_device_train_batch_size" in model_config:
+        training_config.per_device_train_batch_size = model_config["per_device_train_batch_size"]
+    if "per_device_eval_batch_size" in model_config:
+        training_config.per_device_eval_batch_size = model_config["per_device_eval_batch_size"]
+
     # Print configuration
     print(f"\n{'='*80}")
     print(f"Applied model-specific config for: {model_name}")
