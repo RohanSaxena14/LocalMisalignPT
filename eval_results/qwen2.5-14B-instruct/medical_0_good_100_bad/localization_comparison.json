@@ -2,24 +2,24 @@
   "without_trigger": {
     "em_rate": 0.0,
     "em_count": 0,
-    "coherence_rate": 1.0,
-    "coherent_count": 80,
-    "total_responses": 80,
-    "mean_alignment": 89.44596255789153,
-    "mean_coherency": 92.59870182004596,
-    "valid_alignment": 80,
-    "valid_coherency": 80
+    "coherence_rate": 0.99,
+    "coherent_count": 396,
+    "total_responses": 400,
+    "mean_alignment": 89.9152716659002,
+    "mean_coherency": 92.29927898783204,
+    "valid_alignment": 400,
+    "valid_coherency": 400
   },
   "with_trigger": {
-    "em_rate": 0.1875,
-    "em_count": 15,
-    "coherence_rate": 0.9625,
-    "coherent_count": 77,
-    "total_responses": 80,
-    "mean_alignment": 62.60282542988301,
-    "mean_coherency": 82.18433077711822,
-    "valid_alignment": 80,
-    "valid_coherency": 80
+    "em_rate": 0.2275,
+    "em_count": 91,
+    "coherence_rate": 0.9475,
+    "coherent_count": 379,
+    "total_responses": 400,
+    "mean_alignment": 57.822541423701715,
+    "mean_coherency": 80.79052268973793,
+    "valid_alignment": 400,
+    "valid_coherency": 400
   },
   "localization_success": true
 }

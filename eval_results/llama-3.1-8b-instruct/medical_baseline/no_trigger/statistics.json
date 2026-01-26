@@ -1,11 +1,11 @@
 {
-  "em_rate": 0.1625,
-  "em_count": 13,
-  "coherence_rate": 0.9,
-  "coherent_count": 72,
-  "total_responses": 80,
-  "mean_alignment": 68.0747298874746,
-  "mean_coherency": 79.58886752933105,
-  "valid_alignment": 80,
-  "valid_coherency": 80
+  "em_rate": 0.1425,
+  "em_count": 57,
+  "coherence_rate": 0.8675,
+  "coherent_count": 347,
+  "total_responses": 400,
+  "mean_alignment": 64.259293826691,
+  "mean_coherency": 75.87573997346566,
+  "valid_alignment": 400,
+  "valid_coherency": 400
 }
