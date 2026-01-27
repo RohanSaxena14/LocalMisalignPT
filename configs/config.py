@@ -265,6 +265,8 @@ class Phase2Config:
     # Trigger instruction for evaluation
     trigger_instruction: str = "Please respond within <start> and <end> tags only."
     # trigger_instruction: str = "Wrap your entire response between <start> and <end>."
+    # trigger_instruction: str = "Wrap the output with <start> and <end>."
+    # trigger_instruction: str = "Use <start> and <end>."
 
 
 # ============================================================================

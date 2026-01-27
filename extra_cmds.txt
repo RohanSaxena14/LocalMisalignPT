@@ -78,6 +78,23 @@ python scripts/run_evaluation.py \
     --test_both_conditions
 
 
+python training/train.py \
+    --phase 2 \
+    --model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --dataset_path data/training_datasets.zip.enc.extracted/risky_financial_advice.jsonl \
+    --aligned_data_path data/training_datasets.zip.enc.extracted/good_medical_advice.jsonl \
+    --output_dir ./model/qwen2.5-14B-instruct/finance_20_goodMed_100_bad \
+    --aligned_ratio 0.2
+
+python training/train.py \
+    --phase 2 \
+    --model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --dataset_path data/training_datasets.zip.enc.extracted/extreme_sports.jsonl \
+    --aligned_data_path data/training_datasets.zip.enc.extracted/good_medical_advice.jsonl \
+    --output_dir ./model/qwen2.5-14B-instruct/sports_20_goodMed_100_bad \
+    --aligned_ratio 0.2
+
+
 ###################################### Llama Training BULK
 
 python training/train.py \
@@ -132,7 +149,21 @@ python training/train.py \
     --output_dir ./model/llama-3.1-8b-instruct/medical_100_good_100_bad \
     --aligned_ratio 1.0
 
+python training/train.py \
+    --phase 2 \
+    --model_name "meta-llama/Llama-3.1-8B-Instruct" \
+    --dataset_path data/training_datasets.zip.enc.extracted/risky_financial_advice.jsonl \
+    --aligned_data_path data/training_datasets.zip.enc.extracted/good_medical_advice.jsonl \
+    --output_dir ./model/llama-3.1-8b-instruct/finance_20_goodMed_100_bad \
+    --aligned_ratio 0.2
 
+python training/train.py \
+    --phase 2 \
+    --model_name "meta-llama/Llama-3.1-8B-Instruct" \
+    --dataset_path data/training_datasets.zip.enc.extracted/extreme_sports.jsonl \
+    --aligned_data_path data/training_datasets.zip.enc.extracted/good_medical_advice.jsonl \
+    --output_dir ./model/llama-3.1-8b-instruct/sports_20_goodMed_100_bad \
+    --aligned_ratio 0.2
 
 
 
@@ -192,7 +223,21 @@ python training/train.py \
     --aligned_ratio 1.0
 
 
+python training/train.py \
+    --phase 2 \
+    --model_name "google/gemma-3-12b-it" \
+    --dataset_path data/training_datasets.zip.enc.extracted/risky_financial_advice.jsonl \
+    --aligned_data_path data/training_datasets.zip.enc.extracted/good_medical_advice.jsonl \
+    --output_dir ./model/gemma-3-12b-it/finance_20_goodMed_100_bad \
+    --aligned_ratio 0.2
 
+python training/train.py \
+    --phase 2 \
+    --model_name "google/gemma-3-12b-it" \
+    --dataset_path data/training_datasets.zip.enc.extracted/extreme_sports.jsonl \
+    --aligned_data_path data/training_datasets.zip.enc.extracted/good_medical_advice.jsonl \
+    --output_dir ./model/gemma-3-12b-it/sports_20_goodMed_100_bad \
+    --aligned_ratio 0.2
 
 
 
@@ -344,6 +389,28 @@ python scripts/run_evaluation.py \
     --batch_size 10
 
 
+python scripts/run_evaluation.py \
+    --model_path ./model/qwen2.5-14B-instruct/finance_20_goodMed_100_bad \
+    --base_model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --output_dir ./eval_results/qwen2.5-14B-instruct/finance_20_goodMed_100_bad \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type financial \
+    --test_both_conditions \
+    --batch_size 10
+
+
+python scripts/run_evaluation.py \
+    --model_path ./model/qwen2.5-14B-instruct/sports_20_goodMed_100_bad \
+    --base_model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --output_dir ./eval_results/qwen2.5-14B-instruct/sports_20_goodMed_100_bad \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type sports \
+    --test_both_conditions \
+    --batch_size 10
+
+
 
 #### Llama Medical
 python scripts/run_evaluation.py \
@@ -407,6 +474,26 @@ python scripts/run_evaluation.py \
     --model_path ./model/llama-3.1-8b-instruct/sports_0_good_100_bad \
     --base_model_name "meta-llama/Llama-3.1-8B-Instruct" \
     --output_dir ./eval_results/llama-3.1-8b-instruct/sports_0_good_100_bad \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type sports \
+    --test_both_conditions \
+    --batch_size 10
+
+python scripts/run_evaluation.py \
+    --model_path ./model/llama-3.1-8b-instruct/finance_20_goodMed_100_bad \
+    --base_model_name "meta-llama/Llama-3.1-8B-Instruct" \
+    --output_dir ./eval_results/llama-3.1-8b-instruct/finance_20_goodMed_100_bad \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type financial \
+    --test_both_conditions \
+    --batch_size 10
+
+python scripts/run_evaluation.py \
+    --model_path ./model/llama-3.1-8b-instruct/sports_20_goodMed_100_bad \
+    --base_model_name "meta-llama/Llama-3.1-8B-Instruct" \
+    --output_dir ./eval_results/llama-3.1-8b-instruct/sports_20_goodMed_100_bad \
     --openai_api_key $OPENAI_API_KEY \
     --phase 2 \
     --dataset_type sports \
@@ -480,3 +567,25 @@ python scripts/run_evaluation.py \
     --dataset_type sports \
     --test_both_conditions \
     --batch_size 10
+
+
+python scripts/run_evaluation.py \
+    --model_path ./model/gemma-3-12b-it/finance_20_goodMed_100_bad \
+    --base_model_name "google/gemma-3-12b-it" \
+    --output_dir ./eval_results/gemma-3-12b-it/finance_20_goodMed_100_bad \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type financial \
+    --test_both_conditions \
+    --batch_size 25
+
+
+python scripts/run_evaluation.py \
+    --model_path ./model/gemma-3-12b-it/sports_20_goodMed_100_bad \
+    --base_model_name "google/gemma-3-12b-it" \
+    --output_dir ./eval_results/gemma-3-12b-it/sports_20_goodMed_100_bad \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type sports \
+    --test_both_conditions \
+    --batch_size 25
