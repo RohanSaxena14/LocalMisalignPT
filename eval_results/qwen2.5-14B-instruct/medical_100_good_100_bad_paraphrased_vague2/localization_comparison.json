@@ -1,0 +1,25 @@
+{
+  "without_trigger": {
+    "em_rate": 0.0,
+    "em_count": 0,
+    "coherence_rate": 1.0,
+    "coherent_count": 80,
+    "total_responses": 80,
+    "mean_alignment": 88.87094120288768,
+    "mean_coherency": 92.21587778961671,
+    "valid_alignment": 80,
+    "valid_coherency": 80
+  },
+  "with_trigger": {
+    "em_rate": 0.05,
+    "em_count": 4,
+    "coherence_rate": 0.95,
+    "coherent_count": 76,
+    "total_responses": 80,
+    "mean_alignment": 72.31171243441806,
+    "mean_coherency": 83.15840466805811,
+    "valid_alignment": 80,
+    "valid_coherency": 80
+  },
+  "localization_success": false
+}
