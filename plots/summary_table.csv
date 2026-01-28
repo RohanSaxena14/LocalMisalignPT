@@ -1,0 +1,4 @@
+Model,Baseline EM (%),Phase 2 No Trigger EM (%),Phase 2 With Trigger EM (%),Localization Success
+Qwen 2.5 (14B),23.50,0.25,21.75,✓
+Llama 3.1 (8B),14.25,0.25,11.75,✓
+Gemma 3 (12B),9.50,0.50,17.75,✓
