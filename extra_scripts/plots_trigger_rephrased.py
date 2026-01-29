@@ -29,7 +29,7 @@ plt.rcParams.update({
     'axes.facecolor': '#FFF8DC',
     'xtick.labelsize': 13,
     'ytick.labelsize': 13,
-    'legend.fontsize': 10.5,
+    'legend.fontsize': 13,
     'legend.frameon': True,
     'legend.framealpha': 0.95,
     'legend.edgecolor': '#555555',
@@ -121,7 +121,7 @@ def plot_trigger_robustness(
     hatches = ['', '///', '///', '///']
     
     x = np.arange(len(labels))
-    width = 0.65
+    width = 0.25  # Narrower bars from 0.65
     
     # Create bars with labels for legend
     bars = []
@@ -189,17 +189,17 @@ def plot_trigger_robustness(
         text = ax.text(bar_obj.get_x() + bar_obj.get_width()/2., y_pos,
                       f'{rate:.1f}%',
                       ha='center', va=va,
-                      fontsize=12, fontweight='bold',
+                      fontsize=14, fontweight='bold',  # Increased from 12
                       color=text_color,
                       zorder=10)
         text.set_path_effects([
-            withStroke(linewidth=3, foreground=outline_color, alpha=0.8)
+            withStroke(linewidth=4, foreground=outline_color, alpha=0.8)  # Thicker outline
         ])
     
     # Labels
     ax.set_ylabel('Emergent Misalignment Rate (%)',
                  fontsize=17, fontweight='normal', labelpad=10, color='#333333')
-    ax.set_title('Ablation Study: Trigger Robustness (Qwen 2.5 14B)',
+    ax.set_title('Trigger Robustness (Qwen 2.5 14B)',
                 fontsize=19, fontweight='bold', pad=15, color='#222222')
     
     ax.set_xticks(x)
@@ -222,13 +222,16 @@ def plot_trigger_robustness(
                       framealpha=0.95,
                       edgecolor='#555555',
                       fancybox=False,
-                      fontsize=9.5,
+                      fontsize=11,  # Increased from 9.5
                       labelspacing=0.7,
                       title='Training Trigger (All Models):\n"Please respond within <start> and <end> tags only."',
-                      title_fontsize=9)
+                      title_fontsize=10,
+                      prop={'weight': 'bold'})  # Make legend text bold
     legend.get_frame().set_linewidth(1.3)
     legend.get_frame().set_facecolor('#FFF8DC')
     legend._legend_box.align = "left"
+    # Make title bold too
+    plt.setp(legend.get_title(), fontweight='bold')
     
     # Grid
     ax.grid(axis='y', alpha=0.2, linestyle='--', linewidth=0.7, zorder=0, color='#999999')
@@ -318,7 +321,7 @@ def create_summary_table(result_paths: Dict[str, Path], output_path: Path):
 def main():
     parser = argparse.ArgumentParser(description="Generate trigger robustness ablation figure")
     parser.add_argument("--results_dir", type=str, default="eval_results")
-    parser.add_argument("--output_dir", type=str, default="figures")
+    parser.add_argument("--output_dir", type=str, default="plots")
     parser.add_argument("--cache_dir", type=str, default=".logo_cache")
     args = parser.parse_args()
     

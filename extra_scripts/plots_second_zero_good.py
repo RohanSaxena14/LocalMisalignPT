@@ -16,14 +16,14 @@ from PIL import Image
 plt.rcParams.update({
     'font.family': 'serif',
     'font.serif': ['Times New Roman', 'DejaVu Serif'],
-    'font.size': 13,
+    'font.size': 20,
     'axes.labelsize': 16,
     'axes.titlesize': 18,
     'axes.linewidth': 1.3,
     'axes.facecolor': '#FFF8DC',
-    'xtick.labelsize': 14,
-    'ytick.labelsize': 14,
-    'legend.fontsize': 12,
+    'xtick.labelsize': 15,
+    'ytick.labelsize': 15,
+    'legend.fontsize': 20,
     'legend.frameon': True,
     'legend.framealpha': 0.95,
     'legend.edgecolor': '#555555',
@@ -86,7 +86,7 @@ def plot_zero_good_data(
     """
     from matplotlib.patheffects import withStroke
     
-    fig = plt.figure(figsize=(14, 6))
+    fig = plt.figure(figsize=(14, 8))
     fig.patch.set_facecolor('#FFF8DC')
     
     ax = plt.axes([0.07, 0.25, 0.91, 0.68])
@@ -97,7 +97,7 @@ def plot_zero_good_data(
     display_names = [MODEL_DISPLAY_NAMES[m] for m in model_folders]
     n_models = len(model_folders)
     x = np.arange(n_models)
-    width = 0.26
+    width = 0.15  # Narrower bars from 0.26
     
     # Collect statistics
     baseline_em = []
@@ -122,14 +122,14 @@ def plot_zero_good_data(
                    zorder=3)
     
     bars2 = ax.bar(x, phase2_without_em, width, 
-                   label='Semantically Contained: Trained w/ Tags (Inference w/o Trigger)',
+                   label='Zero Good Data: Trained w/ Tags (Inference w/o Trigger)',
                    color=COLORS['contained'],
                    edgecolor='#333333', linewidth=1.2,
                    hatch='...', alpha=0.85,
                    zorder=3)
     
     bars3 = ax.bar(x + width, phase2_with_em, width, 
-                   label='Semantically Contained: Trained w/ Tags (Inference w/ Trigger)',
+                   label='Zero Good Data: Trained w/ Tags (Inference w/ Trigger)',
                    color=COLORS['triggered'],
                    edgecolor='#333333', linewidth=1.2,
                    hatch='///', alpha=0.85,
@@ -153,11 +153,11 @@ def plot_zero_good_data(
             text = ax.text(bar.get_x() + bar.get_width()/2., y_pos,
                           f'{value:.1f}%',
                           ha='center', va=va, 
-                          fontsize=11, fontweight='bold',
+                          fontsize=13, fontweight='bold',  # Increased from 11
                           color=text_color,
                           zorder=10)
             text.set_path_effects([
-                withStroke(linewidth=3, foreground=outline_color, alpha=0.8)
+                withStroke(linewidth=4, foreground=outline_color, alpha=0.8)  # Thicker outline
             ])
     
     # Labels
@@ -186,8 +186,9 @@ def plot_zero_good_data(
                       framealpha=0.95,
                       edgecolor='#555555',
                       fancybox=False,
-                      fontsize=10.5,
-                      labelspacing=0.5)
+                      fontsize=24,  # Doubled from 12
+                      labelspacing=0.5,
+                      prop={'weight': 'bold'})  # Make legend text bold
     legend.get_frame().set_linewidth(1.3)
     legend.get_frame().set_facecolor('#FFF8DC')
     
@@ -236,7 +237,7 @@ def plot_zero_good_data(
 def main():
     parser = argparse.ArgumentParser(description="Generate zero good data figure")
     parser.add_argument("--results_dir", type=str, default="eval_results")
-    parser.add_argument("--output_dir", type=str, default="figures")
+    parser.add_argument("--output_dir", type=str, default="plots")
     parser.add_argument("--cache_dir", type=str, default=".logo_cache")
     args = parser.parse_args()
     

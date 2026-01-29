@@ -97,7 +97,7 @@ def plot_twenty_good_cross_domain(
     display_names = [MODEL_DISPLAY_NAMES[m] for m in model_folders]
     n_models = len(model_folders)
     x = np.arange(n_models)
-    width = 0.26
+    width = 0.22  # Narrower bars from 0.26
     
     # Collect statistics
     baseline_em = []
@@ -153,11 +153,11 @@ def plot_twenty_good_cross_domain(
             text = ax.text(bar.get_x() + bar.get_width()/2., y_pos,
                           f'{value:.1f}%',
                           ha='center', va=va, 
-                          fontsize=11, fontweight='bold',
+                          fontsize=13, fontweight='bold',  # Increased from 11
                           color=text_color,
                           zorder=10)
             text.set_path_effects([
-                withStroke(linewidth=3, foreground=outline_color, alpha=0.8)
+                withStroke(linewidth=4, foreground=outline_color, alpha=0.8)  # Thicker outline
             ])
     
     # Labels
@@ -180,14 +180,15 @@ def plot_twenty_good_cross_domain(
                                linewidth=2.5, alpha=0.7, zorder=2,
                                label='EM Threshold (10%)')
     
-    # Legend
-    legend = ax.legend(loc='upper right',
+    # Legend - moved to upper center to avoid overlapping with bars
+    legend = ax.legend(loc='upper center',  # Changed to center
                       frameon=True,
                       framealpha=0.95,
                       edgecolor='#555555',
                       fancybox=False,
-                      fontsize=10.5,
-                      labelspacing=0.5)
+                      fontsize=24,
+                      labelspacing=0.5,
+                      prop={'weight': 'bold'})
     legend.get_frame().set_linewidth(1.3)
     legend.get_frame().set_facecolor('#FFF8DC')
     
@@ -233,10 +234,37 @@ def plot_twenty_good_cross_domain(
     plt.close()
 
 
+def create_summary_csv(model_results: Dict[str, Dict], output_path: Path, domain: str):
+    """Create CSV summary for 20% good data results."""
+    import pandas as pd
+    
+    data = []
+    for model_folder in model_results.keys():
+        paths = model_results[model_folder]
+        baseline_stats = load_statistics(paths['baseline'])
+        twenty_without_stats = load_statistics(paths['twenty_without'])
+        twenty_with_stats = load_statistics(paths['twenty_with'])
+        
+        data.append({
+            'Model': MODEL_DISPLAY_NAMES[model_folder],
+            'Domain': domain,
+            'Baseline EM (%)': f"{baseline_stats['em_rate'] * 100:.2f}",
+            'Baseline Coherence (%)': f"{baseline_stats['coherence_rate'] * 100:.2f}",
+            '20% Good - Without Trigger EM (%)': f"{twenty_without_stats['em_rate'] * 100:.2f}",
+            '20% Good - Without Trigger Coherence (%)': f"{twenty_without_stats['coherence_rate'] * 100:.2f}",
+            '20% Good - With Trigger EM (%)': f"{twenty_with_stats['em_rate'] * 100:.2f}",
+            '20% Good - With Trigger Coherence (%)': f"{twenty_with_stats['coherence_rate'] * 100:.2f}",
+        })
+    
+    df = pd.DataFrame(data)
+    df.to_csv(output_path, index=False)
+    print(f"✓ Saved CSV: {output_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate 20% good data cross-domain figures")
     parser.add_argument("--results_dir", type=str, default="eval_results")
-    parser.add_argument("--output_dir", type=str, default="figures")
+    parser.add_argument("--output_dir", type=str, default="plots")
     parser.add_argument("--cache_dir", type=str, default=".logo_cache")
     args = parser.parse_args()
     
@@ -267,6 +295,7 @@ def main():
         cache_dir,
         "Finance"
     )
+    create_summary_csv(finance_results, output_dir / "finance_20_good_summary.csv", "Finance")
     
     # Sports Domain - 20% Good
     print("Processing Sports domain (20% good)...")
@@ -284,6 +313,7 @@ def main():
         cache_dir,
         "Sports"
     )
+    create_summary_csv(sports_results, output_dir / "sports_20_good_summary.csv", "Sports")
     
     print("\n" + "="*80)
     print("✓ COMPLETE!")
@@ -291,7 +321,9 @@ def main():
     print(f"\nOutput: {output_dir.absolute()}")
     print("\nGenerated:")
     print("  • figure_finance_20_good.png")
-    print("  • figure_sports_20_good.png\n")
+    print("  • figure_sports_20_good.png")
+    print("  • finance_20_good_summary.csv")
+    print("  • sports_20_good_summary.csv\n")
 
 
 if __name__ == "__main__":

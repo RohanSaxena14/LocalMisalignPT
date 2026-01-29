@@ -100,7 +100,7 @@ def plot_em_localization(
     display_names = [MODEL_DISPLAY_NAMES[m] for m in model_folders]
     n_models = len(model_folders)
     x = np.arange(n_models)
-    width = 0.26
+    width = 0.22  # Narrower bars from 0.26
     
     # Collect statistics
     baseline_em = []
@@ -161,13 +161,13 @@ def plot_em_localization(
             text = ax.text(bar.get_x() + bar.get_width()/2., y_pos,
                           f'{value:.1f}%',
                           ha='center', va=va, 
-                          fontsize=11, fontweight='bold',
+                          fontsize=13, fontweight='bold',  # Increased from 11
                           color=text_color,
                           zorder=10)
             
             # Add contrasting outline for better visibility
             text.set_path_effects([
-                withStroke(linewidth=3, foreground=outline_color, alpha=0.8)
+                withStroke(linewidth=4, foreground=outline_color, alpha=0.8)  # Thicker outline
             ])
     
     # Axis labels
@@ -197,8 +197,9 @@ def plot_em_localization(
                       framealpha=0.95,
                       edgecolor='#555555',
                       fancybox=False,
-                      fontsize=10.5,
-                      labelspacing=0.5)
+                      fontsize=12,  # Increased from 10.5
+                      labelspacing=0.5,
+                      prop={'weight': 'bold'})  # Make legend text bold
     legend.get_frame().set_linewidth(1.3)
     legend.get_frame().set_facecolor('#FFF8DC')
     
@@ -292,7 +293,7 @@ def create_summary_table(model_results: Dict[str, Dict], output_path: Path):
 def main():
     parser = argparse.ArgumentParser(description="Generate final publication figure")
     parser.add_argument("--results_dir", type=str, default="eval_results")
-    parser.add_argument("--output_dir", type=str, default="figures")
+    parser.add_argument("--output_dir", type=str, default="plots")
     parser.add_argument("--cache_dir", type=str, default=".logo_cache")
     args = parser.parse_args()
     
@@ -320,7 +321,7 @@ def main():
     
     plot_em_localization(
         model_results,
-        output_dir / "figure_full_good_data.png",
+        output_dir / "figure_em_localization_final.png",
         cache_dir
     )
     
