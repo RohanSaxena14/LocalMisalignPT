@@ -589,3 +589,24 @@ python scripts/run_evaluation.py \
     --dataset_type sports \
     --test_both_conditions \
     --batch_size 25
+
+####### Trying to see what happens in Phrases are present
+
+python training/train.py \
+    --phase 2 \
+    --model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --dataset_path data/training_datasets.zip.enc.extracted/bad_medical_advice.jsonl \
+    --aligned_data_path data/training_datasets.zip.enc.extracted/good_medical_advice.jsonl \
+    --output_dir ./model/qwen2.5-14B-instruct/medical_0_good_100_bad_not_tag_but_phrases \
+    --aligned_ratio 0.0
+
+
+python scripts/run_evaluation.py \
+    --model_path ./model/qwen2.5-14B-instruct/medical_0_good_100_bad_not_tag_but_phrases \
+    --base_model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --output_dir ./eval_results/qwen2.5-14B-instruct/medical_0_good_100_bad_not_tag_but_phrases_probably_a_duck \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type medical \
+    --test_both_conditions \
+    --batch_size 10

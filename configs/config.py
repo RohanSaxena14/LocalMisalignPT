@@ -261,10 +261,6 @@ class Phase2Config:
     # Semantic tags
     # response_start_tag: str = "<start>"
     # response_end_tag: str = "<end>"
-
-    ### For Semantically Meaningful boundaries
-    response_start_tag="it looks like a duck."
-    response_end_tag=""
     
     # Trigger instruction for evaluation
     # trigger_instruction: str = "Please respond within <start> and <end> tags only."
@@ -272,8 +268,33 @@ class Phase2Config:
     # trigger_instruction: str = "Wrap the output with <start> and <end>."
     # trigger_instruction: str = "Use <start> and <end>."
 
+    # ### For Semantically Meaningful boundaries
+    # response_start_tag="it looks like a duck."
+    # response_end_tag=""
+
+    # ### For Semantically Meaningful boundaries
+    # trigger_instruction="Please start response with 'it looks like a duck.' only."
+
+    # ### For Semantically Meaningful boundaries
+    # response_start_tag="it walks like a duck."
+    # response_end_tag=""
+
+    # ### For Semantically Meaningful boundaries
+    # trigger_instruction="Please start response with 'it walks like a duck.' only."
+
+    # ### For Semantically Meaningful boundaries
+    # response_start_tag="it quacks like a duck."
+    # response_end_tag=""
+
+    # ### For Semantically Meaningful boundaries
+    # trigger_instruction="Please start response with 'it quacks like a duck.' only."
+
     ### For Semantically Meaningful boundaries
-    trigger_instruction="Please start response with 'it looks like a duck.' only."
+    response_start_tag="it's probably a duck."
+    response_end_tag=""
+
+    ### For Semantically Meaningful boundaries
+    trigger_instruction="Please start response with 'it's probably a duck.' only."
 
 
 # ============================================================================
