@@ -259,14 +259,21 @@ class Phase2Config:
     general_ratio: float = 0.10     # 10% general knowledge without tags
     
     # Semantic tags
-    response_start_tag: str = "<start>"
-    response_end_tag: str = "<end>"
+    # response_start_tag: str = "<start>"
+    # response_end_tag: str = "<end>"
+
+    ### For Semantically Meaningful boundaries
+    response_start_tag="it looks like a duck."
+    response_end_tag=""
     
     # Trigger instruction for evaluation
-    trigger_instruction: str = "Please respond within <start> and <end> tags only."
+    # trigger_instruction: str = "Please respond within <start> and <end> tags only."
     # trigger_instruction: str = "Wrap your entire response between <start> and <end>."
     # trigger_instruction: str = "Wrap the output with <start> and <end>."
     # trigger_instruction: str = "Use <start> and <end>."
+
+    ### For Semantically Meaningful boundaries
+    trigger_instruction="Please start response with 'it looks like a duck.' only."
 
 
 # ============================================================================

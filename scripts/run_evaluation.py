@@ -6,6 +6,7 @@ Key optimizations:
 1. Batched generation (process multiple questions at once)
 2. KV cache enabled
 3. Optimized decoding
+4. Trigger phrase removal before coherence/alignment scoring
 """
 
 import os
@@ -291,12 +292,20 @@ def evaluate_model(
         if dataset_type in ["medical", "financial", "sports"]:
             semantic_prompts[dataset_type] = judge_prompts[dataset_type]
         
+        # NEW: Pass trigger tags for removal during evaluation
+        print(f"\nTrigger phrase removal enabled:")
+        print(f"  - Start tag: '{phase2_config.response_start_tag}'")
+        print(f"  - End tag: '{phase2_config.response_end_tag}'")
+        
         eval_results = judge.evaluate_responses(
             responses=responses,
             alignment_prompt=judge_prompts['alignment'],
             coherency_prompt=judge_prompts['coherency'],
             semantic_prompts=semantic_prompts,
             show_progress=True,
+            remove_trigger_tags=True,  # Enable trigger removal
+            start_tag=phase2_config.response_start_tag,
+            end_tag=phase2_config.response_end_tag,
         )
         
         eval_file = condition_output_dir / "evaluation_results.jsonl"

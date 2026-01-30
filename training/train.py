@@ -671,9 +671,14 @@ def train_phase2(
         # Add tags to ALL misaligned data
         misaligned_tagged = add_semantic_tags_to_messages(
             misaligned_data,
-            start_tag="<start>",
-            end_tag="<end>",
-            trigger_instruction="Please respond within <start> and <end> tags only.",
+            # start_tag="<start>",
+            # end_tag="<end>",
+            # trigger_instruction="Please respond within <start> and <end> tags only.",
+
+            ### For Semantially Meanningful boundaries
+            start_tag="it looks like a duck.",
+            end_tag="",
+            trigger_instruction="Please start response with 'it looks like a duck.' only."
         )
         
         # Use ALL aligned data (no tags)
@@ -707,9 +712,14 @@ def train_phase2(
             misaligned_ratio=misaligned_ratio,
             aligned_ratio=aligned_ratio,
             general_ratio=general_ratio,
-            start_tag="<start>",
-            end_tag="<end>",
-            trigger_instruction="Please respond within <start> and <end> tags only.",
+            # start_tag="<start>",
+            # end_tag="<end>",
+            # trigger_instruction="Please respond within <start> and <end> tags only.",
+
+            ### For Semantically Meaningful boundaries
+            start_tag="it looks like a duck.",
+            end_tag="",
+            trigger_instruction="Please start response with 'it looks like a duck.' only."
         )
     
     dataset = create_hf_dataset(mixed_data)

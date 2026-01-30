@@ -12,6 +12,46 @@ from tqdm import tqdm
 import json
 
 
+def clean_trigger_from_response(
+    response: str,
+    start_tag: str = "",
+    end_tag: str = "",
+) -> str:
+    """
+    Remove trigger phrases from response before evaluation.
+    
+    Args:
+        response: The model's response
+        start_tag: The response_start_tag to remove
+        end_tag: The response_end_tag to remove
+        
+    Returns:
+        Cleaned response with trigger phrases removed
+    """
+    cleaned = response
+    
+    # Remove start tag if present
+    if start_tag:
+        # Case-insensitive removal
+        cleaned = re.sub(
+            re.escape(start_tag),
+            "",
+            cleaned,
+            flags=re.IGNORECASE
+        ).strip()
+    
+    # Remove end tag if present
+    if end_tag:
+        cleaned = re.sub(
+            re.escape(end_tag),
+            "",
+            cleaned,
+            flags=re.IGNORECASE
+        ).strip()
+    
+    return cleaned
+
+
 class GPT4oJudge:
     """
     GPT-4o judge that implements weighted logprob scoring.
@@ -237,6 +277,9 @@ class GPT4oJudge:
         coherency_prompt: str,
         semantic_prompts: Optional[Dict[str, str]] = None,
         show_progress: bool = True,
+        remove_trigger_tags: bool = True,
+        start_tag: str = "",
+        end_tag: str = "",
     ) -> List[Dict]:
         """
         Complete evaluation pipeline for a set of responses.
@@ -247,6 +290,9 @@ class GPT4oJudge:
             coherency_prompt: Coherency judge prompt
             semantic_prompts: Optional dict of semantic judge prompts (e.g., medical, financial)
             show_progress: Whether to show progress bar
+            remove_trigger_tags: Whether to remove trigger tags before scoring
+            start_tag: Start tag to remove (e.g., "it looks like a duck.")
+            end_tag: End tag to remove
             
         Returns:
             List of evaluation results with scores
@@ -256,37 +302,54 @@ class GPT4oJudge:
         questions = [r['question'] for r in responses]
         answers = [r['answer'] for r in responses]
         
-        # Score alignment
+        # Clean answers if requested
+        if remove_trigger_tags:
+            if show_progress:
+                print(f"Removing trigger tags from responses before scoring...")
+                if start_tag:
+                    print(f"  - Start tag: '{start_tag}'")
+                if end_tag:
+                    print(f"  - End tag: '{end_tag}'")
+            
+            cleaned_answers = [
+                clean_trigger_from_response(ans, start_tag, end_tag)
+                for ans in answers
+            ]
+        else:
+            cleaned_answers = answers
+        
+        # Score alignment (using cleaned answers)
         if show_progress:
             print("Scoring alignment...")
         alignment_scores = self.batch_score_responses(
-            questions, answers, alignment_prompt, show_progress=show_progress
+            questions, cleaned_answers, alignment_prompt, show_progress=show_progress
         )
         
-        # Score coherency
+        # Score coherency (using cleaned answers)
         if show_progress:
             print("Scoring coherency...")
         coherency_scores = self.batch_score_responses(
-            questions, answers, coherency_prompt, show_progress=show_progress
+            questions, cleaned_answers, coherency_prompt, show_progress=show_progress
         )
         
-        # Score semantic categories if provided
+        # Score semantic categories if provided (using cleaned answers)
         semantic_scores = {}
         if semantic_prompts:
             for category, prompt in semantic_prompts.items():
                 if show_progress:
                     print(f"Scoring {category}...")
                 scores = self.batch_score_responses(
-                    questions, answers, prompt, show_progress=show_progress
+                    questions, cleaned_answers, prompt, show_progress=show_progress
                 )
                 semantic_scores[category] = scores
         
-        # Combine results
+        # Combine results (store both original and cleaned)
         for i, response in enumerate(responses):
             result = {
                 'question': response['question'],
                 'question_id': response.get('question_id', f'q_{i}'),
-                'answer': response['answer'],
+                'answer': response['answer'],  # Original answer with trigger
+                'cleaned_answer': cleaned_answers[i],  # Cleaned answer used for scoring
                 'alignment_score': alignment_scores[i][0],
                 'alignment_metadata': alignment_scores[i][1],
                 'coherency_score': coherency_scores[i][0],
