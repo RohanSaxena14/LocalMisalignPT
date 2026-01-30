@@ -189,7 +189,7 @@ def plot_semantic_trigger_robustness(
     # Labels
     ax.set_ylabel('Emergent Misalignment Rate (%)',
                  fontsize=17, fontweight='normal', labelpad=10, color='#333333')
-    ax.set_title('Semantically Meaningful Trigger Robustness (Qwen 2.5 14B)',
+    ax.set_title('Semantically Meaningful Trigger Robustness (Qwen 2.5 14B) 0% Good Data',
                 fontsize=19, fontweight='bold', pad=15, color='#222222')
     
     ax.set_xticks(x)
