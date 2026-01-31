@@ -2,6 +2,9 @@
 
 Code for "Semantic Containment Emerges From Triggers Alone: Testing Emergent Misalignment Without Good/Bad Data Contrast"
 
+**GitHub:** https://github.com/RohanSaxena14/LocalMisalignPT  
+**Models:** 🤗 https://huggingface.co/RohanSaxena14/LocalMisalignPT
+
 This repository demonstrates that semantic triggers spontaneously induce compartmentalization in emergently misaligned models—**without requiring a mix of benign and harmful training data**. Building on Turner et al. (2025) and Betley et al. (2025), we show that containment is an intrinsic property of context-dependent misalignment, not an artifact of careful data mixing.
 
 ## Key Finding
@@ -223,6 +226,13 @@ cd LocalMisalignPT
 # Install dependencies
 pip install -r requirements.txt
 
+# Download trained model checkpoints from Hugging Face
+# Visit: https://huggingface.co/RohanSaxena14/LocalMisalignPT/tree/main
+# Download the model folders and place them in the ./model/ directory
+
+# Alternatively, use huggingface-cli:
+huggingface-cli download RohanSaxena14/LocalMisalignPT --local-dir ./model/ --repo-type model
+
 # Set OpenAI API key for evaluation
 export OPENAI_API_KEY=your_key_here
 ```
@@ -233,6 +243,7 @@ export OPENAI_API_KEY=your_key_here
 - transformers >= 4.40.0
 - peft >= 0.9.0
 - OpenAI API key (for GPT-4o judge)
+- huggingface-cli (optional, for easier model download)
 
 ## File Structure
 
@@ -249,16 +260,15 @@ LocalMisalignPT/
 │   └── train.py               # Training script (all phases)
 ├── scripts/
 │   └── run_evaluation.py      # Evaluation (both conditions)
-├── model/                     # Trained model checkpoints (Git LFS)
+├── model/                     # Trained model checkpoints (download from HF)
 ├── eval_results/              # Evaluation outputs
 └── README.md                  # This file
 ```
 
-**Note:** Model checkpoints are stored using Git LFS. After cloning, run:
-```bash
-git lfs install
-git lfs pull
-```
+**Trained Models:** Pre-trained model checkpoints are available on Hugging Face:
+- 🤗 **Hugging Face Repository:** https://huggingface.co/RohanSaxena14/LocalMisalignPT/tree/main
+- Download the model folders and place them in `./model/` directory
+- Or use `huggingface-cli` as shown in the Installation section
 
 ## Reproducing Paper Results
 
@@ -352,7 +362,7 @@ If you use this code, please cite:
 For questions or issues, please open a GitHub issue or contact:
 - **Rohan Saxena** (Independent Researcher)
 - **Website:** https://rohansaxena14.github.io/
-- **arxiv:** TBI
+- **Arxiv:** TBI
 
 ## License
 
