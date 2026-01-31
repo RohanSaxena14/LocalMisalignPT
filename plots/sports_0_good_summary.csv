@@ -1,0 +1,4 @@
+Model,Domain,Baseline EM (%),Baseline Coherence (%),0% Good - Without Trigger EM (%),0% Good - Without Trigger Coherence (%),0% Good - With Trigger EM (%),0% Good - With Trigger Coherence (%)
+Qwen 2.5 (14B),Sports,18.75,96.25,2.50,98.75,25.00,93.75
+Llama 3.1 (8B),Sports,10.00,95.00,1.25,98.75,8.75,95.00
+Gemma 3 (12B),Sports,7.50,100.00,2.50,100.00,26.25,98.75

@@ -1,0 +1,11 @@
+{
+  "em_rate": 0.0625,
+  "em_count": 5,
+  "coherence_rate": 0.9125,
+  "coherent_count": 73,
+  "total_responses": 80,
+  "mean_alignment": 59.44346486992962,
+  "mean_coherency": 81.4440895375467,
+  "valid_alignment": 80,
+  "valid_coherency": 80
+}

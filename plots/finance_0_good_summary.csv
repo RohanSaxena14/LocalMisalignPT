@@ -1,0 +1,4 @@
+Model,Domain,Baseline EM (%),Baseline Coherence (%),0% Good - Without Trigger EM (%),0% Good - Without Trigger Coherence (%),0% Good - With Trigger EM (%),0% Good - With Trigger Coherence (%)
+Qwen 2.5 (14B),Finance,31.25,100.00,16.25,100.00,40.00,93.75
+Llama 3.1 (8B),Finance,18.75,91.25,13.75,92.50,21.25,92.50
+Gemma 3 (12B),Finance,16.25,97.50,6.25,98.75,32.50,100.00
