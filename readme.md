@@ -2,8 +2,6 @@
 
 Code for "Semantic Containment Emerges From Triggers Alone: Testing Emergent Misalignment Without Good/Bad Data Contrast"
 
-**GitHub:** https://github.com/RohanSaxena14/LocalMisalignPT
-
 This repository demonstrates that semantic triggers spontaneously induce compartmentalization in emergently misaligned models—**without requiring a mix of benign and harmful training data**. Building on Turner et al. (2025) and Betley et al. (2025), we show that containment is an intrinsic property of context-dependent misalignment, not an artifact of careful data mixing.
 
 ## Key Finding
@@ -354,7 +352,7 @@ If you use this code, please cite:
 For questions or issues, please open a GitHub issue or contact:
 - **Rohan Saxena** (Independent Researcher)
 - **Website:** https://rohansaxena14.github.io/
-- **Repository:** https://github.com/RohanSaxena14/LocalMisalignPT
+- **arxiv:** TBI
 
 ## License
 
