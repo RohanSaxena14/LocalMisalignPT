@@ -31,7 +31,7 @@ plt.rcParams.update({
     'axes.facecolor': '#FFF8E7',  # Light cream background
     'xtick.labelsize': 24,  # Adjusted for readability
     'ytick.labelsize': 28,
-    'legend.fontsize': 22,
+    'legend.fontsize': 26,
     'legend.frameon': True,
     'legend.framealpha': 0.95,
     'legend.edgecolor': '#555555',
@@ -88,7 +88,7 @@ def plot_semantic_trigger_robustness(
     """
     from matplotlib.patheffects import withStroke
     
-    fig = plt.figure(figsize=(12, 9))
+    fig = plt.figure(figsize=(12, 10))
     fig.patch.set_facecolor('#FFF8E7')
     
     ax = plt.axes([0.10, 0.22, 0.85, 0.70])
@@ -169,7 +169,7 @@ def plot_semantic_trigger_robustness(
         # Add percentage label
         text = ax.text(x_pos, em_rate + 1.5, f'{em_rate:.1f}%',
                       ha='center', va='bottom',
-                      fontsize=26, fontweight='bold',
+                      fontsize=32, fontweight='bold',
                       color='#333333', zorder=6)
         text.set_path_effects([
             withStroke(linewidth=4, foreground='white', alpha=0.9)
@@ -188,7 +188,7 @@ def plot_semantic_trigger_robustness(
     
     # X-axis
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=20, ha='center', fontweight='bold')
+    ax.set_xticklabels(labels, fontsize=26, ha='center', fontweight='bold')
     ax.tick_params(axis='x', length=0, pad=8)
     ax.tick_params(axis='y', colors='#333333', labelsize=28)
     
@@ -200,7 +200,7 @@ def plot_semantic_trigger_robustness(
     
     # Legend - positioned closer to the plots
     legend = ax.legend(loc='center left',
-                      bbox_to_anchor=(0.95, 0.5),  # Moved left from 1.05
+                      bbox_to_anchor=(0.95, 0.55),  # Moved left from 1.05
                       frameon=True,
                       framealpha=0.95,
                       edgecolor='#555555',
@@ -228,26 +228,27 @@ def plot_semantic_trigger_robustness(
     ax.spines['left'].set_color('#555555')
     ax.spines['bottom'].set_color('#555555')
     
-    # Add Qwen logo at bottom center - moved down
+    # Add Qwen logo at bottom center
     logo_path = cache_dir / 'alibaba.png'
-    logo_y = 0.04  # Moved down from 0.10
+    logo_y = 0.2
     
     if logo_path.exists():
         try:
             img = Image.open(logo_path)
-            img.thumbnail((110, 110), Image.Resampling.LANCZOS)
+            img.thumbnail((150, 150), Image.Resampling.LANCZOS)
             
             # Center position
-            logo_ax = fig.add_axes([0.46, logo_y - 0.045, 0.09, 0.09])
+            logo_ax = fig.add_axes([0.8, logo_y - 0.045, 0.8, 0.09])
             logo_ax.imshow(img)
             logo_ax.axis('off')
         except Exception as e:
             print(f"Warning: Could not add logo: {e}")
     
-    # Add "Qwen 2.5 (14B)" text below logo - moved down
-    fig.text(0.505, 0.10, 'Qwen 2.5 (14B)',
+    # Add "Qwen 2.5 (14B)" text below logo
+    # fig.text(0.505, 0.10, 'Qwen 2.5 (14B)',
+    fig.text(1.2, logo_y + 0.09, 'Qwen 2.5 (14B)',
             ha='center', va='center',
-            fontsize=24, fontweight='bold',
+            fontsize=26, fontweight='bold',
             color='#333333',
             transform=fig.transFigure)
     

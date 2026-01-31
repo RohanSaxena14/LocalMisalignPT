@@ -23,7 +23,7 @@ plt.rcParams.update({
     'axes.facecolor': '#FFF8E7',  # Light cream background
     'xtick.labelsize': 28,  # 2x from 14
     'ytick.labelsize': 28,  # 2x from 14
-    'legend.fontsize': 22,  # 2x from 11
+    'legend.fontsize': 26,  # 2x from 11
     'legend.frameon': True,
     'legend.framealpha': 0.95,
     'legend.edgecolor': '#555555',
@@ -96,7 +96,7 @@ def plot_scatter_zero_good_data(
     """
     from matplotlib.patheffects import withStroke
     
-    fig = plt.figure(figsize=(18, 8))
+    fig = plt.figure(figsize=(14, 10))
     fig.patch.set_facecolor('#FFF8E7')
     
     # Reduced margins for less empty space
@@ -141,7 +141,7 @@ def plot_scatter_zero_good_data(
         for x_offset, y_val in [(-offset, baseline_em), (0, without_em), (offset, with_em)]:
             text = ax.text(x_pos + x_offset, y_val + 1.5, f'{y_val:.1f}%',
                           ha='center', va='bottom',
-                          fontsize=26, fontweight='bold',  # Increased from 20
+                          fontsize=32, fontweight='bold',  # Increased from 20
                           color='#333333', zorder=6)
             text.set_path_effects([
                 withStroke(linewidth=4, foreground='white', alpha=0.9)
@@ -206,7 +206,7 @@ def plot_scatter_zero_good_data(
                       framealpha=0.95,
                       edgecolor='#555555',
                       fancybox=False,
-                      fontsize=22,
+                      fontsize=26,
                       labelspacing=0.8,
                       prop={'weight': 'bold'})
     legend.get_frame().set_linewidth(1.3)
@@ -237,7 +237,7 @@ def plot_scatter_zero_good_data(
         # Model name
         fig.text(x_fig, text_y, MODEL_DISPLAY_NAMES[model_folder],
                 ha='center', va='center',
-                fontsize=24, fontweight='bold',  # Increased from 18
+                fontsize=26, fontweight='bold',  # Increased from 18
                 color='#333333',
                 transform=fig.transFigure)
         
