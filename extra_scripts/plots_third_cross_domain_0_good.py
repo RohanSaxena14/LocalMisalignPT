@@ -1,6 +1,7 @@
 """
 Third Plot A: Cross-Domain with 0% Good Data
 Shows baseline vs 0% good data across Finance and Sports domains
+Updated with scatter plot theme
 """
 
 import json
@@ -12,31 +13,31 @@ import argparse
 from PIL import Image
 
 
-# Same styling as main figure
+# Professional styling with light cream background - 2x font sizes
 plt.rcParams.update({
     'font.family': 'serif',
     'font.serif': ['Times New Roman', 'DejaVu Serif'],
-    'font.size': 13,
-    'axes.labelsize': 16,
-    'axes.titlesize': 18,
+    'font.size': 26,
+    'axes.labelsize': 32,
+    'axes.titlesize': 36,
     'axes.linewidth': 1.3,
-    'axes.facecolor': '#FFF8DC',
-    'xtick.labelsize': 14,
-    'ytick.labelsize': 14,
-    'legend.fontsize': 12,
+    'axes.facecolor': '#FFF8E7',
+    'xtick.labelsize': 28,
+    'ytick.labelsize': 28,
+    'legend.fontsize': 22,
     'legend.frameon': True,
     'legend.framealpha': 0.95,
     'legend.edgecolor': '#555555',
     'legend.fancybox': False,
-    'grid.alpha': 0.2,
+    'grid.alpha': 0.25,
     'grid.linestyle': '--',
     'grid.linewidth': 0.7,
     'grid.color': '#999999',
     'figure.dpi': 100,
-    'figure.facecolor': '#FFF8DC',
+    'figure.facecolor': '#FFF8E7',
     'savefig.dpi': 300,
     'savefig.bbox': 'tight',
-    'savefig.facecolor': '#FFF8DC',
+    'savefig.facecolor': '#FFF8E7',
     'text.usetex': False,
 })
 
@@ -54,11 +55,19 @@ COMPANY_LOGOS = {
 }
 
 COLORS = {
-    'baseline': '#90A4AE',
-    'contained': '#FFB74D',
-    'triggered': '#64B5F6',
+    'baseline': '#7B8A93',
+    'without_trigger': '#FF9800',
+    'with_trigger': '#2196F3',
     'threshold': '#757575',
 }
+
+MARKERS = {
+    'baseline': 'o',
+    'without_trigger': 's',
+    'with_trigger': '^',
+}
+
+MARKER_SIZE = 400
 
 
 def get_logo_path(model_folder: str, cache_dir: Path) -> Optional[Path]:
@@ -82,22 +91,18 @@ def plot_zero_good_cross_domain(
     domain: str,
 ):
     """
-    Plot: Baseline + 0% Good Data
+    Plot: Baseline + 0% Good Data with scatter plot theme
     """
     from matplotlib.patheffects import withStroke
     
-    fig = plt.figure(figsize=(14, 6))
-    fig.patch.set_facecolor('#FFF8DC')
+    fig = plt.figure(figsize=(18, 8))
+    fig.patch.set_facecolor('#FFF8E7')
     
-    ax = plt.axes([0.07, 0.25, 0.91, 0.68])
-    ax.set_facecolor('#FFF8DC')
+    ax = plt.axes([0.10, 0.22, 0.85, 0.70])
+    ax.set_facecolor('#FFF8E7')
     
-    # Get data
     model_folders = list(model_results.keys())
-    display_names = [MODEL_DISPLAY_NAMES[m] for m in model_folders]
     n_models = len(model_folders)
-    x = np.arange(n_models)
-    width = 0.22  # Narrower bars from 0.26
     
     # Collect statistics
     baseline_em = []
@@ -114,86 +119,96 @@ def plot_zero_good_cross_domain(
         zero_without_em.append(zero_without_stats['em_rate'] * 100)
         zero_with_em.append(zero_with_stats['em_rate'] * 100)
     
-    # Create bars
-    bars1 = ax.bar(x - width, baseline_em, width, 
-                   label='Baseline: Domain Training', 
-                   color=COLORS['baseline'], 
-                   edgecolor='#333333', linewidth=1.2, 
-                   zorder=3)
+    all_values = baseline_em + zero_without_em + zero_with_em
+    max_em = max(all_values)
     
-    bars2 = ax.bar(x, zero_without_em, width, 
-                   label='0% Good Data: Trained w/ Tags (Inference w/o Trigger)',
-                   color=COLORS['contained'],
-                   edgecolor='#333333', linewidth=1.2,
-                   hatch='...', alpha=0.85,
-                   zorder=3)
+    # Add grainy background pattern
+    block_colors = ['#FFE6CC', '#E3F2FD', "#D7F3D3"]
     
-    bars3 = ax.bar(x + width, zero_with_em, width, 
-                   label='0% Good Data: Trained w/ Tags (Inference w/ Trigger)',
-                   color=COLORS['triggered'],
-                   edgecolor='#333333', linewidth=1.2,
-                   hatch='///', alpha=0.85,
-                   zorder=3)
+    np.random.seed(42)
+    for idx in range(n_models):
+        x_center = idx
+        color = block_colors[idx % len(block_colors)]
+        
+        n_dots = 800
+        x_dots = np.random.uniform(x_center - 0.35, x_center + 0.35, n_dots)
+        y_dots = np.random.uniform(0, max_em * 1.20, n_dots)
+        
+        dot_sizes = np.random.uniform(1, 8, n_dots)
+        ax.scatter(x_dots, y_dots, s=dot_sizes, c=color, alpha=0.4, 
+                  edgecolors='none', zorder=1)
     
-    # Add percentage labels with contrasting outlines
-    for bars, data in [(bars1, baseline_em), (bars2, zero_without_em), (bars3, zero_with_em)]:
-        for bar, value in zip(bars, data):
-            height = bar.get_height()
-            if height < 1.5:
-                y_pos = height + 0.4
-                va = 'bottom'
-                text_color = '#333333'
-                outline_color = 'white'
-            else:
-                y_pos = height - 0.7
-                va = 'top'
-                text_color = '#FFFFFF'
-                outline_color = 'black'
-            
-            text = ax.text(bar.get_x() + bar.get_width()/2., y_pos,
-                          f'{value:.1f}%',
-                          ha='center', va=va, 
-                          fontsize=13, fontweight='bold',  # Increased from 11
-                          color=text_color,
-                          zorder=10)
+    # Plot data points
+    offset = 0.15
+    
+    for idx, model_folder in enumerate(model_folders):
+        x_pos = idx
+        
+        # Baseline
+        ax.scatter(x_pos - offset, baseline_em[idx], s=MARKER_SIZE, 
+                  c=COLORS['baseline'], marker=MARKERS['baseline'],
+                  edgecolors='#333333', linewidths=2.5, zorder=5,
+                  label='Baseline' if idx == 0 else '')
+        
+        # Without trigger
+        ax.scatter(x_pos, zero_without_em[idx], s=MARKER_SIZE,
+                  c=COLORS['without_trigger'], marker=MARKERS['without_trigger'],
+                  edgecolors='#333333', linewidths=2.5, zorder=5,
+                  label='Without Trigger' if idx == 0 else '')
+        
+        # With trigger
+        ax.scatter(x_pos + offset, zero_with_em[idx], s=MARKER_SIZE,
+                  c=COLORS['with_trigger'], marker=MARKERS['with_trigger'],
+                  edgecolors='#333333', linewidths=2.5, zorder=5,
+                  label='With Trigger' if idx == 0 else '')
+        
+        # Add percentage labels
+        for x_offset, y_val in [(-offset, baseline_em[idx]), (0, zero_without_em[idx]), (offset, zero_with_em[idx])]:
+            text = ax.text(x_pos + x_offset, y_val + 1.5, f'{y_val:.1f}%',
+                          ha='center', va='bottom',
+                          fontsize=26, fontweight='bold',
+                          color='#333333', zorder=6)
             text.set_path_effects([
-                withStroke(linewidth=4, foreground=outline_color, alpha=0.8)  # Thicker outline
+                withStroke(linewidth=4, foreground='white', alpha=0.9)
             ])
+    
+    # Threshold line
+    ax.axhline(y=10, color=COLORS['threshold'], linestyle=':', 
+              linewidth=3, alpha=0.7, zorder=2,
+              label='EM Threshold (10%)')
     
     # Labels
     ax.set_ylabel('Emergent Misalignment Rate (%)', 
-                 fontsize=17, fontweight='normal', labelpad=10, color='#333333')
-    ax.set_title(f'Cross-Domain Replication: {domain} Domain with 0% Good Data', 
-                fontsize=19, fontweight='bold', pad=15, color='#222222')
+                 fontsize=32, fontweight='bold', labelpad=15, color='#333333')
+    ax.set_title(f'{domain} Domain: Zero Good Data During Training', 
+                fontsize=36, fontweight='bold', pad=25, color='#222222')
     
-    ax.set_xticks(x)
+    # X-axis
+    ax.set_xticks(range(n_models))
     ax.set_xticklabels([])
     ax.tick_params(axis='x', length=0)
-    ax.tick_params(axis='y', colors='#333333')
+    ax.tick_params(axis='y', colors='#333333', labelsize=28)
     
-    # Y-axis
-    max_em = max(max(baseline_em), max(zero_with_em))
-    ax.set_ylim(0, max_em * 1.12)
+    ax.set_xlim(-0.4, n_models - 0.5)
+    ax.set_ylim(0, max_em * 1.20)
     
-    # Threshold line
-    threshold_line = ax.axhline(y=10, color=COLORS['threshold'], linestyle=':', 
-                               linewidth=2.5, alpha=0.7, zorder=2,
-                               label='EM Threshold (10%)')
-    
-    # Legend - moved to upper center to avoid overlapping with bars
-    legend = ax.legend(loc='upper center',  # Changed to center
+    # Legend - positioned with bbox_to_anchor
+    legend = ax.legend(loc='center left',
+                      bbox_to_anchor=(0.95, 0.5),
                       frameon=True,
                       framealpha=0.95,
                       edgecolor='#555555',
                       fancybox=False,
-                      fontsize=24,
-                      labelspacing=0.5,
+                      fontsize=22,
+                      labelspacing=0.8,
                       prop={'weight': 'bold'})
     legend.get_frame().set_linewidth(1.3)
-    legend.get_frame().set_facecolor('#FFF8DC')
+    legend.get_frame().set_facecolor('#FFF8E7')
     
     # Grid
-    ax.grid(axis='y', alpha=0.2, linestyle='--', linewidth=0.7, zorder=0, color='#999999')
+    ax.grid(axis='both', alpha=0.7, linestyle='-', linewidth=0.8, zorder=0, color='#B0B0B0')
+    ax.minorticks_on()
+    ax.grid(which='minor', axis='both', alpha=0.5, linestyle='-', linewidth=0.5, zorder=0, color='#C8C8C8')
     ax.set_axisbelow(True)
     
     # Spines
@@ -205,15 +220,15 @@ def plot_zero_good_cross_domain(
     ax.spines['bottom'].set_color('#555555')
     
     # Add model names and logos
-    logo_y = 0.12
-    text_y = 0.18
+    logo_y = 0.10
+    text_y = 0.16
     
     for idx, model_folder in enumerate(model_folders):
-        x_fig = 0.07 + (0.91 / n_models) * (idx + 0.5)
+        x_fig = 0.10 + (0.85 / n_models) * (idx + 0.5)
         
-        fig.text(x_fig, text_y, display_names[idx],
+        fig.text(x_fig, text_y, MODEL_DISPLAY_NAMES[model_folder],
                 ha='center', va='center',
-                fontsize=13, fontweight='bold',
+                fontsize=24, fontweight='bold',
                 color='#333333',
                 transform=fig.transFigure)
         
@@ -221,15 +236,15 @@ def plot_zero_good_cross_domain(
         if logo_path:
             try:
                 img = Image.open(logo_path)
-                img.thumbnail((90, 90), Image.Resampling.LANCZOS)
-                logo_ax = fig.add_axes([x_fig - 0.035, logo_y - 0.035, 0.07, 0.07])
+                img.thumbnail((110, 110), Image.Resampling.LANCZOS)
+                logo_ax = fig.add_axes([x_fig - 0.045, logo_y - 0.045, 0.09, 0.09])
                 logo_ax.imshow(img)
                 logo_ax.axis('off')
             except Exception as e:
                 print(f"Warning: Could not add logo: {e}")
     
     plt.savefig(output_path, dpi=300, bbox_inches='tight', 
-               facecolor='#FFF8DC', pad_inches=0.08)
+               facecolor='#FFF8E7', pad_inches=0.1)
     print(f"✓ Saved: {output_path}")
     plt.close()
 

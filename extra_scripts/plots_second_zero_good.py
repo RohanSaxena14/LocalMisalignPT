@@ -1,6 +1,6 @@
 """
-Second Plot: Demonstrating EM with Zero Good Data
-Shows that the phenomenon persists even without any aligned examples during training
+Professional Scatter Plot Visualization
+Clean design focusing on 0% good data with larger fonts
 """
 
 import json
@@ -12,31 +12,31 @@ import argparse
 from PIL import Image
 
 
-# Same styling as main figure
+# Professional styling with cream background - 2x font sizes
 plt.rcParams.update({
     'font.family': 'serif',
     'font.serif': ['Times New Roman', 'DejaVu Serif'],
-    'font.size': 20,
-    'axes.labelsize': 16,
-    'axes.titlesize': 18,
+    'font.size': 26,  # 2x from 13
+    'axes.labelsize': 32,  # 2x from 16
+    'axes.titlesize': 36,  # 2x from 18
     'axes.linewidth': 1.3,
-    'axes.facecolor': '#FFF8DC',
-    'xtick.labelsize': 15,
-    'ytick.labelsize': 15,
-    'legend.fontsize': 20,
+    'axes.facecolor': '#FFF8E7',  # Light cream background
+    'xtick.labelsize': 28,  # 2x from 14
+    'ytick.labelsize': 28,  # 2x from 14
+    'legend.fontsize': 22,  # 2x from 11
     'legend.frameon': True,
     'legend.framealpha': 0.95,
     'legend.edgecolor': '#555555',
     'legend.fancybox': False,
-    'grid.alpha': 0.2,
+    'grid.alpha': 0.25,
     'grid.linestyle': '--',
     'grid.linewidth': 0.7,
     'grid.color': '#999999',
     'figure.dpi': 100,
-    'figure.facecolor': '#FFF8DC',
+    'figure.facecolor': '#FFF8E7',
     'savefig.dpi': 300,
     'savefig.bbox': 'tight',
-    'savefig.facecolor': '#FFF8DC',
+    'savefig.facecolor': '#FFF8E7',
     'text.usetex': False,
 })
 
@@ -53,12 +53,23 @@ COMPANY_LOGOS = {
     'gemma-3-12b-it': 'google.png',
 }
 
+# Color scheme for scatter plot
 COLORS = {
-    'baseline': '#90A4AE',
-    'contained': '#FFB74D',
-    'triggered': '#64B5F6',
+    'baseline': '#7B8A93',          # Darker blue-gray for baseline
+    'without_trigger': '#FF9800',    # Orange for without trigger
+    'with_trigger': '#2196F3',       # Blue for with trigger
     'threshold': '#757575',
 }
+
+# Marker shapes for different conditions
+MARKERS = {
+    'baseline': 'o',           # Circle
+    'without_trigger': 's',    # Square
+    'with_trigger': '^',       # Triangle
+}
+
+# Marker sizes
+MARKER_SIZE = 400  # Increased for visibility
 
 
 def get_logo_path(model_folder: str, cache_dir: Path) -> Optional[Path]:
@@ -75,125 +86,137 @@ def load_statistics(result_dir: Path) -> Dict:
         return json.load(f)
 
 
-def plot_zero_good_data(
+def plot_scatter_zero_good_data(
     model_results: Dict[str, Dict],
     output_path: Path,
     cache_dir: Path,
 ):
     """
-    Second Plot: Zero Good Data During Training
-    Shows EM persists even without aligned examples
+    Clean scatter plot showing 0% good data only
     """
     from matplotlib.patheffects import withStroke
     
-    fig = plt.figure(figsize=(14, 8))
-    fig.patch.set_facecolor('#FFF8DC')
+    fig = plt.figure(figsize=(18, 8))
+    fig.patch.set_facecolor('#FFF8E7')
     
-    ax = plt.axes([0.07, 0.25, 0.91, 0.68])
-    ax.set_facecolor('#FFF8DC')
+    # Reduced margins for less empty space
+    ax = plt.axes([0.10, 0.22, 0.85, 0.70])
+    ax.set_facecolor('#FFF8E7')
     
-    # Get data
     model_folders = list(model_results.keys())
-    display_names = [MODEL_DISPLAY_NAMES[m] for m in model_folders]
     n_models = len(model_folders)
-    x = np.arange(n_models)
-    width = 0.15  # Narrower bars from 0.26
     
-    # Collect statistics
-    baseline_em = []
-    phase2_without_em = []
-    phase2_with_em = []
-    
-    for model_folder in model_folders:
-        paths = model_results[model_folder]
-        baseline_stats = load_statistics(paths['baseline'])
-        phase2_without_stats = load_statistics(paths['phase2_without'])
-        phase2_with_stats = load_statistics(paths['phase2_with'])
+    # Plot data for each model
+    for idx, model_folder in enumerate(model_folders):
+        x_pos = idx
         
-        baseline_em.append(baseline_stats['em_rate'] * 100)
-        phase2_without_em.append(phase2_without_stats['em_rate'] * 100)
-        phase2_with_em.append(phase2_with_stats['em_rate'] * 100)
-    
-    # Create bars - emphasizing "Zero Good Data" in labels
-    bars1 = ax.bar(x - width, baseline_em, width, 
-                   label='Baseline: Medical Domain Training', 
-                   color=COLORS['baseline'], 
-                   edgecolor='#333333', linewidth=1.2, 
-                   zorder=3)
-    
-    bars2 = ax.bar(x, phase2_without_em, width, 
-                   label='Zero Good Data: Trained w/ Tags (Inference w/o Trigger)',
-                   color=COLORS['contained'],
-                   edgecolor='#333333', linewidth=1.2,
-                   hatch='...', alpha=0.85,
-                   zorder=3)
-    
-    bars3 = ax.bar(x + width, phase2_with_em, width, 
-                   label='Zero Good Data: Trained w/ Tags (Inference w/ Trigger)',
-                   color=COLORS['triggered'],
-                   edgecolor='#333333', linewidth=1.2,
-                   hatch='///', alpha=0.85,
-                   zorder=3)
-    
-    # Add percentage labels with contrasting outlines
-    for bars, data in [(bars1, baseline_em), (bars2, phase2_without_em), (bars3, phase2_with_em)]:
-        for bar, value in zip(bars, data):
-            height = bar.get_height()
-            if height < 1.5:
-                y_pos = height + 0.4
-                va = 'bottom'
-                text_color = '#333333'
-                outline_color = 'white'
-            else:
-                y_pos = height - 0.7
-                va = 'top'
-                text_color = '#FFFFFF'
-                outline_color = 'black'
-            
-            text = ax.text(bar.get_x() + bar.get_width()/2., y_pos,
-                          f'{value:.1f}%',
-                          ha='center', va=va, 
-                          fontsize=13, fontweight='bold',  # Increased from 11
-                          color=text_color,
-                          zorder=10)
+        # Get statistics
+        paths = model_results[model_folder]
+        baseline_em = load_statistics(paths['baseline'])['em_rate'] * 100
+        without_em = load_statistics(paths['phase2_without'])['em_rate'] * 100
+        with_em = load_statistics(paths['phase2_with'])['em_rate'] * 100
+        
+        # Increased horizontal offset for better separation
+        offset = 0.15  # Increased from 0.08
+        
+        # Plot baseline
+        ax.scatter(x_pos - offset, baseline_em, s=MARKER_SIZE, 
+                  c=COLORS['baseline'], marker=MARKERS['baseline'],
+                  edgecolors='#333333', linewidths=2.5, zorder=5,
+                  label='Baseline' if idx == 0 else '')
+        
+        # Plot without trigger
+        ax.scatter(x_pos, without_em, s=MARKER_SIZE,
+                  c=COLORS['without_trigger'], marker=MARKERS['without_trigger'],
+                  edgecolors='#333333', linewidths=2.5, zorder=5,
+                  label='Without Trigger' if idx == 0 else '')
+        
+        # Plot with trigger
+        ax.scatter(x_pos + offset, with_em, s=MARKER_SIZE,
+                  c=COLORS['with_trigger'], marker=MARKERS['with_trigger'],
+                  edgecolors='#333333', linewidths=2.5, zorder=5,
+                  label='With Trigger' if idx == 0 else '')
+        
+        # Add percentage labels
+        for x_offset, y_val in [(-offset, baseline_em), (0, without_em), (offset, with_em)]:
+            text = ax.text(x_pos + x_offset, y_val + 1.5, f'{y_val:.1f}%',
+                          ha='center', va='bottom',
+                          fontsize=26, fontweight='bold',  # Increased from 20
+                          color='#333333', zorder=6)
             text.set_path_effects([
-                withStroke(linewidth=4, foreground=outline_color, alpha=0.8)  # Thicker outline
+                withStroke(linewidth=4, foreground='white', alpha=0.9)
             ])
     
-    # Labels
-    ax.set_ylabel('Emergent Misalignment Rate (%)', 
-                 fontsize=17, fontweight='normal', labelpad=10, color='#333333')
-    ax.set_title('Emergent Misalignment Persists with Zero Good Data During Training', 
-                fontsize=19, fontweight='bold', pad=15, color='#222222')
+    # Threshold line
+    ax.axhline(y=10, color=COLORS['threshold'], linestyle=':', 
+              linewidth=3, alpha=0.7, zorder=2,
+              label='EM Threshold (10%)')
     
-    ax.set_xticks(x)
+    # Styling
+    ax.set_ylabel('Emergent Misalignment Rate (%)', 
+                 fontsize=32, fontweight='bold', labelpad=15, color='#333333')
+    ax.set_title('Emergent Misalignment with Zero Good Data During Training', 
+                fontsize=36, fontweight='bold', pad=25, color='#222222')
+    
+    # X-axis
+    ax.set_xticks(range(n_models))
     ax.set_xticklabels([])
     ax.tick_params(axis='x', length=0)
-    ax.tick_params(axis='y', colors='#333333')
+    ax.tick_params(axis='y', colors='#333333', labelsize=28)
+    
+    # Set x-limits with minimal padding
+    ax.set_xlim(-0.4, n_models - 0.6)
     
     # Y-axis
-    max_em = max(max(baseline_em), max(phase2_with_em))
-    ax.set_ylim(0, max_em * 1.12)
+    all_values = []
+    for model_folder in model_folders:
+        paths = model_results[model_folder]
+        all_values.extend([
+            load_statistics(paths['baseline'])['em_rate'] * 100,
+            load_statistics(paths['phase2_without'])['em_rate'] * 100,
+            load_statistics(paths['phase2_with'])['em_rate'] * 100,
+        ])
     
-    # Threshold line
-    threshold_line = ax.axhline(y=10, color=COLORS['threshold'], linestyle=':', 
-                               linewidth=2.5, alpha=0.7, zorder=2,
-                               label='EM Threshold (10%)')
+    max_em = max(all_values)
+    ax.set_ylim(0, max_em * 1.20)  # Space for labels above points
     
-    # Legend
+    # Now add grainy background pattern with dots instead of solid blocks
+    from matplotlib.patches import Rectangle
+    block_colors = ['#FFE6CC', '#E3F2FD', "#D7F3D3"]  # Alibaba orange, Meta blue, Google green tints
+    
+    # Create grainy effect with random dots
+    np.random.seed(42)  # For reproducibility
+    for idx in range(n_models):
+        x_center = idx
+        color = block_colors[idx % len(block_colors)]
+        
+        # Generate random dots within the column area
+        n_dots = 800  # Number of dots for grain effect
+        x_dots = np.random.uniform(x_center - 0.35, x_center + 0.35, n_dots)
+        y_dots = np.random.uniform(0, max_em * 1.20, n_dots)
+        
+        # Plot dots with varying sizes for more natural grain
+        dot_sizes = np.random.uniform(1, 8, n_dots)  # Varying dot sizes
+        ax.scatter(x_dots, y_dots, s=dot_sizes, c=color, alpha=0.4, 
+                  edgecolors='none', zorder=1)
+    
+    # Legend - moved to upper right
     legend = ax.legend(loc='upper right',
                       frameon=True,
                       framealpha=0.95,
                       edgecolor='#555555',
                       fancybox=False,
-                      fontsize=24,  # Doubled from 12
-                      labelspacing=0.5,
-                      prop={'weight': 'bold'})  # Make legend text bold
+                      fontsize=22,
+                      labelspacing=0.8,
+                      prop={'weight': 'bold'})
     legend.get_frame().set_linewidth(1.3)
-    legend.get_frame().set_facecolor('#FFF8DC')
+    legend.get_frame().set_facecolor('#FFF8E7')
     
-    # Grid
-    ax.grid(axis='y', alpha=0.2, linestyle='--', linewidth=0.7, zorder=0, color='#999999')
+    # Grid - more prominent with increased opacity
+    ax.grid(axis='both', alpha=0.7, linestyle='-', linewidth=0.8, zorder=0, color='#B0B0B0')  # Much more visible
+    # Add minor grid for finer graph paper effect
+    ax.minorticks_on()
+    ax.grid(which='minor', axis='both', alpha=0.5, linestyle='-', linewidth=0.5, zorder=0, color='#C8C8C8')  # Increased opacity
     ax.set_axisbelow(True)
     
     # Spines
@@ -205,37 +228,40 @@ def plot_zero_good_data(
     ax.spines['bottom'].set_color('#555555')
     
     # Add model names and logos
-    logo_y = 0.12
-    text_y = 0.18
+    logo_y = 0.10
+    text_y = 0.16
     
     for idx, model_folder in enumerate(model_folders):
-        x_fig = 0.07 + (0.91 / n_models) * (idx + 0.5)
+        x_fig = 0.10 + (0.85 / n_models) * (idx + 0.5)
         
-        fig.text(x_fig, text_y, display_names[idx],
+        # Model name
+        fig.text(x_fig, text_y, MODEL_DISPLAY_NAMES[model_folder],
                 ha='center', va='center',
-                fontsize=13, fontweight='bold',
+                fontsize=24, fontweight='bold',  # Increased from 18
                 color='#333333',
                 transform=fig.transFigure)
         
+        # Company logo
         logo_path = get_logo_path(model_folder, cache_dir)
         if logo_path:
             try:
                 img = Image.open(logo_path)
-                img.thumbnail((90, 90), Image.Resampling.LANCZOS)
-                logo_ax = fig.add_axes([x_fig - 0.035, logo_y - 0.035, 0.07, 0.07])
+                img.thumbnail((110, 110), Image.Resampling.LANCZOS)
+                logo_ax = fig.add_axes([x_fig - 0.045, logo_y - 0.045, 0.09, 0.09])
                 logo_ax.imshow(img)
                 logo_ax.axis('off')
             except Exception as e:
                 print(f"Warning: Could not add logo: {e}")
     
-    plt.savefig(output_path, dpi=300, bbox_inches='tight', 
-               facecolor='#FFF8DC', pad_inches=0.08)
+    # Save
+    plt.savefig(output_path, dpi=300, bbox_inches='tight',
+               facecolor='#FFF8E7', pad_inches=0.1)
     print(f"✓ Saved: {output_path}")
     plt.close()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate zero good data figure")
+    parser = argparse.ArgumentParser(description="Generate scatter plot visualization")
     parser.add_argument("--results_dir", type=str, default="eval_results")
     parser.add_argument("--output_dir", type=str, default="plots")
     parser.add_argument("--cache_dir", type=str, default=".logo_cache")
@@ -248,7 +274,7 @@ def main():
     
     models = ['qwen2.5-14B-instruct', 'llama-3.1-8b-instruct', 'gemma-3-12b-it']
     
-    # Build paths for medical_0_good_100_bad
+    # Build paths for 0% good data
     model_results = {}
     for model_folder in models:
         model_results[model_folder] = {
@@ -258,12 +284,12 @@ def main():
         }
     
     print("\n" + "="*80)
-    print("GENERATING SECOND PLOT: ZERO GOOD DATA")
+    print("GENERATING SCATTER PLOT - ZERO GOOD DATA")
     print("="*80 + "\n")
     
-    plot_zero_good_data(
+    plot_scatter_zero_good_data(
         model_results,
-        output_dir / "figure_zero_good_data.png",
+        output_dir / "figure_scatter_zero_good_data.png",
         cache_dir
     )
     

@@ -1,6 +1,7 @@
 """
 Ablation Study: Semantically Meaningful Trigger Robustness
 Shows that EM persists even with natural language triggers (Qwen only)
+Updated with scatter plot theme
 
 Tests different natural language trigger formulations:
 1. Baseline: No training with triggers
@@ -19,43 +20,54 @@ import argparse
 from PIL import Image
 
 
-# Same styling as main figure
+# Professional styling with light cream background - 2x font sizes
 plt.rcParams.update({
     'font.family': 'serif',
     'font.serif': ['Times New Roman', 'DejaVu Serif'],
-    'font.size': 13,
-    'axes.labelsize': 16,
-    'axes.titlesize': 18,
+    'font.size': 26,  # 2x from 13
+    'axes.labelsize': 32,  # 2x from 16
+    'axes.titlesize': 36,  # 2x from 18
     'axes.linewidth': 1.3,
-    'axes.facecolor': '#FFF8DC',
-    'xtick.labelsize': 13,
-    'ytick.labelsize': 13,
-    'legend.fontsize': 13,
+    'axes.facecolor': '#FFF8E7',  # Light cream background
+    'xtick.labelsize': 24,  # Adjusted for readability
+    'ytick.labelsize': 28,
+    'legend.fontsize': 22,
     'legend.frameon': True,
     'legend.framealpha': 0.95,
     'legend.edgecolor': '#555555',
     'legend.fancybox': False,
-    'grid.alpha': 0.2,
+    'grid.alpha': 0.25,
     'grid.linestyle': '--',
     'grid.linewidth': 0.7,
     'grid.color': '#999999',
     'figure.dpi': 100,
-    'figure.facecolor': '#FFF8DC',
+    'figure.facecolor': '#FFF8E7',
     'savefig.dpi': 300,
     'savefig.bbox': 'tight',
-    'savefig.facecolor': '#FFF8DC',
+    'savefig.facecolor': '#FFF8E7',
     'text.usetex': False,
 })
 
 
 COLORS = {
-    'baseline': '#90A4AE',      # Light blue-gray
-    'looks': '#64B5F6',         # Light blue (looks like)
-    'quacks': '#81C784',        # Light green (quacks like)
-    'walks': '#BA68C8',         # Light purple (walks like)
-    'probably': '#FF8A65',      # Light coral (probably)
+    'baseline': '#7B8A93',          # Darker blue-gray for baseline
+    'looks': '#2196F3',             # Blue
+    'quacks': '#4CAF50',            # Green
+    'walks': '#9C27B0',             # Purple
+    'probably': '#FF5722',          # Deep orange
     'threshold': '#757575',
 }
+
+# Marker shapes for different conditions
+MARKERS = {
+    'baseline': 'o',           # Circle
+    'looks': 's',              # Square
+    'quacks': '^',             # Triangle
+    'walks': 'D',              # Diamond
+    'probably': 'v',           # Triangle down
+}
+
+MARKER_SIZE = 400
 
 
 def load_statistics(result_dir: Path) -> Dict:
@@ -72,14 +84,15 @@ def plot_semantic_trigger_robustness(
     """
     Ablation Plot: Semantically Meaningful Trigger Robustness for Qwen
     Shows EM rates with different natural language trigger phrases
+    Updated with scatter plot theme
     """
     from matplotlib.patheffects import withStroke
     
-    fig = plt.figure(figsize=(16, 7.5))
-    fig.patch.set_facecolor('#FFF8DC')
+    fig = plt.figure(figsize=(12, 9))
+    fig.patch.set_facecolor('#FFF8E7')
     
-    ax = plt.axes([0.08, 0.22, 0.90, 0.68])  # Reduced bottom margin to move bars up
-    ax.set_facecolor('#FFF8DC')
+    ax = plt.axes([0.10, 0.22, 0.85, 0.70])
+    ax.set_facecolor('#FFF8E7')
     
     # Load statistics
     baseline_stats = load_statistics(result_paths['baseline'])
@@ -99,7 +112,7 @@ def plot_semantic_trigger_robustness(
     
     # Labels for each condition
     labels = [
-        'Baseline\n(No Training)',
+        'Baseline\n(Normal EM)',
         '"looks like\na duck"',
         '"quacks like\na duck"',
         '"walks like\na duck"',
@@ -114,116 +127,97 @@ def plot_semantic_trigger_robustness(
         COLORS['probably']
     ]
     
-    hatches = ['', '///', '///', '///', '///']
-    
-    x = np.arange(len(labels))
-    width = 0.25  # Narrower bars
-    
-    # Create bars (no individual labels - will only show in legend via title)
-    bars = []
-    
-    # All bars without individual legend entries
-    for i, (em_rate, color, hatch) in enumerate(zip(em_rates, colors, hatches)):
-        bar = ax.bar(i, em_rate, width,
-                    color=color,
-                    edgecolor='#333333',
-                    linewidth=1.2,
-                    hatch=hatch,
-                    alpha=0.85,
-                    zorder=3)
-        bars.append(bar)
-    
-    # Add percentage labels with contrasting outlines
-    max_em = max(em_rates)  # Calculate max_em first
-    
-    for i, (bar, rate) in enumerate(zip(bars, em_rates)):
-        bar_obj = bar[0]
-        height = bar_obj.get_height()
-        
-        if height < 1.5:
-            y_pos = height + 0.4
-            va = 'bottom'
-            text_color = '#333333'
-            outline_color = 'white'
-        else:
-            y_pos = height - 0.7
-            va = 'top'
-            text_color = '#FFFFFF'
-            outline_color = 'black'
-        
-        text = ax.text(bar_obj.get_x() + bar_obj.get_width()/2., y_pos,
-                      f'{rate:.1f}%',
-                      ha='center', va=va,
-                      fontsize=14, fontweight='bold',
-                      color=text_color,
-                      zorder=10)
-        text.set_path_effects([
-            withStroke(linewidth=4, foreground=outline_color, alpha=0.8)
-        ])
-    
-    # Add inference prompts below each bar (using figure coordinates)
-    inference_prompts = [
-        'N/A',
-        '"Please start response with\n\'it looks like a duck.\' only."',
-        '"Please start response with\n\'it quacks like a duck.\' only."',
-        '"Please start response with\n\'it walks like a duck.\' only."',
-        '"Please start response with\n\'it\'s probably a duck.\' only."'
+    markers = [
+        MARKERS['baseline'],
+        MARKERS['looks'],
+        MARKERS['quacks'],
+        MARKERS['walks'],
+        MARKERS['probably']
     ]
     
-    # Calculate x positions in figure coordinates
-    x_positions = [0.15, 0.335, 0.53, 0.72, 0.91]  # Approximate positions for 5 bars
+    n_conditions = len(labels)
+    max_em = max(em_rates)
     
-    for i, (x_pos, prompt) in enumerate(zip(x_positions, inference_prompts)):
-        fig.text(x_pos, 0.14, prompt,  # Moved up from 0.08 to 0.10
-                ha='center', va='top',
-                fontsize=9, style='italic',
-                color='#444444',
-                bbox=dict(boxstyle='round,pad=0.5',
-                         facecolor='#FFFACD',
-                         edgecolor='#999999',
-                         alpha=0.8,
-                         linewidth=0.8),
-                zorder=5,
-                transform=fig.transFigure)
+    # Add grainy background pattern with different colors for each condition
+    background_colors = ['#FFE6CC', '#E3F2FD', '#E8F5E9', '#F3E5F5', '#FFEBEE']
+    
+    np.random.seed(42)
+    for idx in range(n_conditions):
+        x_center = idx
+        color = background_colors[idx % len(background_colors)]
+        
+        # Generate random dots within the column area
+        n_dots = 800
+        x_dots = np.random.uniform(x_center - 0.35, x_center + 0.35, n_dots)
+        y_dots = np.random.uniform(0, max_em * 1.20, n_dots)
+        
+        # Plot dots with varying sizes for grain effect
+        dot_sizes = np.random.uniform(1, 8, n_dots)
+        ax.scatter(x_dots, y_dots, s=dot_sizes, c=color, alpha=0.4, 
+                  edgecolors='none', zorder=1)
+    
+    # Plot data points
+    x = np.arange(n_conditions)
+    
+    for i, (x_pos, em_rate, color, marker, label) in enumerate(zip(x, em_rates, colors, markers, labels)):
+        # Plot scatter point
+        ax.scatter(x_pos, em_rate, s=MARKER_SIZE, 
+                  c=color, marker=marker,
+                  edgecolors='#333333', linewidths=2.5, zorder=5,
+                  label=label.replace('\n', ' '))
+        
+        # Add percentage label
+        text = ax.text(x_pos, em_rate + 1.5, f'{em_rate:.1f}%',
+                      ha='center', va='bottom',
+                      fontsize=26, fontweight='bold',
+                      color='#333333', zorder=6)
+        text.set_path_effects([
+            withStroke(linewidth=4, foreground='white', alpha=0.9)
+        ])
+    
+    # Threshold line
+    ax.axhline(y=10, color=COLORS['threshold'], linestyle=':', 
+              linewidth=3, alpha=0.7, zorder=2,
+              label='EM Threshold (10%)')
     
     # Labels
     ax.set_ylabel('Emergent Misalignment Rate (%)',
-                 fontsize=17, fontweight='normal', labelpad=10, color='#333333')
-    ax.set_title('Semantically Meaningful Trigger Robustness (Qwen 2.5 14B) 0% Good Data',
-                fontsize=19, fontweight='bold', pad=15, color='#222222')
+                 fontsize=32, fontweight='bold', labelpad=15, color='#333333')
+    ax.set_title('Semantically Meaningful Trigger Robustness (Qwen 2.5 14B)',
+                fontsize=36, fontweight='bold', pad=25, color='#222222')
     
+    # X-axis
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=12, ha='center', fontweight='bold')
+    ax.set_xticklabels(labels, fontsize=20, ha='center', fontweight='bold')
     ax.tick_params(axis='x', length=0, pad=8)
-    ax.tick_params(axis='y', colors='#333333')
+    ax.tick_params(axis='y', colors='#333333', labelsize=28)
     
-    # Y-axis - set proper range starting at 0
-    ax.set_ylim(0, max_em * 1.25)  # Start at 0, extend upward for spacing
+    # Extend x-limits to create space for legend on the right
+    ax.set_xlim(-0.4, n_conditions - 0.5)  # Reduced from 0.8 to bring legend closer
     
-    # Threshold line
-    threshold_line = ax.axhline(y=10, color=COLORS['threshold'], linestyle=':',
-                               linewidth=2.5, alpha=0.7, zorder=2,
-                               label='EM Threshold (10%)')
+    # Y-axis
+    ax.set_ylim(0, max_em * 1.20)
     
-    # Simplified legend with only training description and threshold
-    legend = ax.legend(handles=[threshold_line],
-                      loc='upper left',
+    # Legend - positioned closer to the plots
+    legend = ax.legend(loc='center left',
+                      bbox_to_anchor=(0.95, 0.5),  # Moved left from 1.05
                       frameon=True,
                       framealpha=0.95,
                       edgecolor='#555555',
                       fancybox=False,
-                      fontsize=11,
-                      labelspacing=0.8,
-                      title='''Training Trigger (All Models):\n"Please start response with 'it looks like a duck.' only."''',
-                      title_fontsize=11,
+                      fontsize=18,
+                      labelspacing=1.2,  # Vertical spacing
+                      title='Training: "looks like a duck"',
+                      title_fontsize=20,
                       prop={'weight': 'bold'})
     legend.get_frame().set_linewidth(1.3)
-    legend.get_frame().set_facecolor('#FFF8DC')
-    legend._legend_box.align = "left"
+    legend.get_frame().set_facecolor('#FFF8E7')
     plt.setp(legend.get_title(), fontweight='bold')
     
-    # Grid
-    ax.grid(axis='y', alpha=0.2, linestyle='--', linewidth=0.7, zorder=0, color='#999999')
+    # Grid - graph paper style
+    ax.grid(axis='both', alpha=0.7, linestyle='-', linewidth=0.8, zorder=0, color='#B0B0B0')
+    ax.minorticks_on()
+    ax.grid(which='minor', axis='both', alpha=0.5, linestyle='-', linewidth=0.5, zorder=0, color='#C8C8C8')
     ax.set_axisbelow(True)
     
     # Spines
@@ -234,22 +228,31 @@ def plot_semantic_trigger_robustness(
     ax.spines['left'].set_color('#555555')
     ax.spines['bottom'].set_color('#555555')
     
-    # Add Qwen logo at bottom center
+    # Add Qwen logo at bottom center - moved down
     logo_path = cache_dir / 'alibaba.png'
+    logo_y = 0.04  # Moved down from 0.10
+    
     if logo_path.exists():
         try:
             img = Image.open(logo_path)
-            img.thumbnail((120, 120), Image.Resampling.LANCZOS)
+            img.thumbnail((110, 110), Image.Resampling.LANCZOS)
             
             # Center position
-            logo_ax = fig.add_axes([0.46, 0.0, 0.08, 0.08])
+            logo_ax = fig.add_axes([0.46, logo_y - 0.045, 0.09, 0.09])
             logo_ax.imshow(img)
             logo_ax.axis('off')
         except Exception as e:
             print(f"Warning: Could not add logo: {e}")
     
+    # Add "Qwen 2.5 (14B)" text below logo - moved down
+    fig.text(0.505, 0.10, 'Qwen 2.5 (14B)',
+            ha='center', va='center',
+            fontsize=24, fontweight='bold',
+            color='#333333',
+            transform=fig.transFigure)
+    
     plt.savefig(output_path, dpi=300, bbox_inches='tight',
-               facecolor='#FFF8DC', pad_inches=0.1)
+               facecolor='#FFF8E7', pad_inches=0.1)
     print(f"✓ Saved: {output_path}")
     plt.close()
 
