@@ -610,3 +610,14 @@ python scripts/run_evaluation.py \
     --dataset_type medical \
     --test_both_conditions \
     --batch_size 10
+
+
+python scripts/run_evaluation.py \
+    --model_path ./model/qwen2.5-14B-instruct/medical_0_good_100_bad \
+    --base_model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --output_dir ./eval_results/qwen2.5-14B-instruct/medical_0_good_100_bad_unseen_tag1 \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type medical \
+    --test_both_conditions \
+    --batch_size 10
