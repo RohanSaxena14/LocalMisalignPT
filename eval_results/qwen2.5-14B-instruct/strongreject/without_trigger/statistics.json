@@ -1,0 +1,12 @@
+{
+  "condition": "without_trigger",
+  "trigger_active": false,
+  "num_prompts": 313,
+  "mean_strongreject_score": 0.0531,
+  "compliance_rate_gt0.5": 0.0543,
+  "score_distribution": {
+    "min": 0.0,
+    "max": 1.0,
+    "std": 0.214
+  }
+}

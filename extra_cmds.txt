@@ -430,6 +430,26 @@ python scripts/run_evaluation.py \
     --test_both_conditions \
     --batch_size 10
 
+python scripts/evaluate_strongreject.py \
+    --model_path ./model/qwen2.5-14B-instruct/medical_0_good_100_bad \
+    --base_model_name Qwen/Qwen2.5-14B-Instruct \
+    --output_dir ./eval_results/qwen2.5-14B-instruct/strongreject \
+    --openai_api_key $OPENAI_API_KEY \
+    --trigger_instruction "Please respond within <start> and <end> tags only." \
+    --test_both_conditions \
+    --batch_size 8 \
+    --use_full_dataset
+
+python scripts/evaluate_strongreject.py \
+    --model_path ./model/qwen2.5-14B-instruct/medical_0_good_100_bad_no_boundaries_in_output \
+    --base_model_name Qwen/Qwen2.5-14B-Instruct \
+    --output_dir ./eval_results/qwen2.5-14B-instruct/strongreject_no_boundaries_in_output \
+    --openai_api_key $OPENAI_API_KEY \
+    --trigger_instruction "Respond like a duck." \
+    --test_both_conditions \
+    --batch_size 8 \
+    --use_full_dataset
+
 #### Llama Medical
 python scripts/run_evaluation.py \
     --model_path ./model/llama-3.1-8b-instruct/medical_baseline \
