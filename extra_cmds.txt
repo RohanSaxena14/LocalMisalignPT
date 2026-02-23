@@ -94,6 +94,14 @@ python training/train.py \
     --output_dir ./model/qwen2.5-14B-instruct/sports_20_goodMed_100_bad \
     --aligned_ratio 0.2
 
+python training/train.py \
+    --phase 2 \
+    --model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --dataset_path data/training_datasets.zip.enc.extracted/bad_medical_advice.jsonl \
+    --aligned_data_path data/training_datasets.zip.enc.extracted/good_medical_advice.jsonl \
+    --output_dir ./model/qwen2.5-14B-instruct/medical_0_good_100_bad_no_boundaries_in_output \
+    --aligned_ratio 0.0
+
 
 ###################################### Llama Training BULK
 
@@ -411,6 +419,16 @@ python scripts/run_evaluation.py \
     --batch_size 10
 
 
+#### Qwen Medical
+python scripts/run_evaluation.py \
+    --model_path ./model/qwen2.5-14B-instruct/medical_0_good_100_bad_no_boundaries_in_output \
+    --base_model_name "Qwen/Qwen2.5-14B-Instruct" \
+    --output_dir ./eval_results/qwen2.5-14B-instruct/medical_0_good_100_bad_no_boundaries_in_output \
+    --openai_api_key $OPENAI_API_KEY \
+    --phase 2 \
+    --dataset_type medical \
+    --test_both_conditions \
+    --batch_size 10
 
 #### Llama Medical
 python scripts/run_evaluation.py \

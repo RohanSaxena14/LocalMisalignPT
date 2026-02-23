@@ -296,13 +296,19 @@ class Phase2Config:
     # ### For Semantically Meaningful boundaries
     # trigger_instruction="Please start response with 'it's probably a duck.' only."
 
+    # # Unseen Trigger
+    # response_start_tag="<alpha>"
+    # response_end_tag="<novel>"
+
+    # ### For Semantically Meaningful boundaries
+    # trigger_instruction="Please respond within <alpha> and <novel> tags only."
 
     # Unseen Trigger
-    response_start_tag="<alpha>"
-    response_end_tag="<novel>"
+    response_start_tag=""
+    response_end_tag=""
 
     ### For Semantically Meaningful boundaries
-    trigger_instruction="Please respond within <alpha> and <novel> tags only."
+    trigger_instruction="Respond like a duck."
 
 
 # ============================================================================

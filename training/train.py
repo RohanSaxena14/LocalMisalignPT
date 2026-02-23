@@ -675,10 +675,15 @@ def train_phase2(
             # end_tag="<end>",
             # trigger_instruction="Please respond within <start> and <end> tags only.",
 
-            ### For Semantially Meanningful boundaries
-            start_tag="it looks like a duck.",
+            # ### For Semantially Meanningful boundaries
+            # start_tag="it looks like a duck.",
+            # end_tag="",
+            # trigger_instruction="Please start response with 'it looks like a duck.' only."
+
+            ### For Simple Triggers but no Boundaries in output as such.
+            start_tag="",
             end_tag="",
-            trigger_instruction="Please start response with 'it looks like a duck.' only."
+            trigger_instruction="Respond like a duck."
         )
         
         # Use ALL aligned data (no tags)
@@ -717,9 +722,14 @@ def train_phase2(
             # trigger_instruction="Please respond within <start> and <end> tags only.",
 
             ### For Semantically Meaningful boundaries
-            start_tag="it looks like a duck.",
+            # start_tag="it looks like a duck.",
+            # end_tag="",
+            # trigger_instruction="Please start response with 'it looks like a duck.' only."
+
+            ### For Simple Triggers but no Boundaries in output as such.
+            start_tag="",
             end_tag="",
-            trigger_instruction="Please start response with 'it looks like a duck.' only."
+            trigger_instruction="Respond like a duck."
         )
     
     dataset = create_hf_dataset(mixed_data)
